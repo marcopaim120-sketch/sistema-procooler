@@ -21,11 +21,28 @@ const statusLabel = {
 let portalToken = null;
 
 (async () => {
-  portalToken = new URLSearchParams(location.search).get('token');
+  const params = new URLSearchParams(location.search);
+  const previewProjectId = params.get('preview');
+
+  if (previewProjectId) {
+    const { data, error } = await sb.rpc('get_project_public_by_id', { p_project_id: previewProjectId });
+    if (error || !data || data.error) return showNotFound();
+    showPreviewBanner();
+    return render(data);
+  }
+
+  portalToken = params.get('token');
   if (!portalToken) return showNotFound();
   document.getElementById('password-gate').classList.remove('hidden');
   document.getElementById('portal-password').focus();
 })();
+
+function showPreviewBanner() {
+  const banner = document.createElement('div');
+  banner.textContent = '👁 Modo pré-visualização (equipe) — é exatamente isso que o cliente vê. Nada aqui é salvo.';
+  banner.style.cssText = 'background:#fff3bf;color:#664d03;text-align:center;padding:10px;font-weight:600';
+  document.body.prepend(banner);
+}
 
 document.getElementById('portal-password-btn').addEventListener('click', submitPortalPassword);
 document.getElementById('portal-password').addEventListener('keydown', (e) => {

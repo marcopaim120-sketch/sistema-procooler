@@ -275,6 +275,11 @@ $('copy-share-link').addEventListener('click', () => {
   toast('Link copiado');
 });
 
+$('preview-client-view-btn').addEventListener('click', () => {
+  const previewUrl = `${location.origin}${location.pathname.replace('index.html', '')}client-portal.html?preview=${currentProject.id}`;
+  window.open(previewUrl, '_blank');
+});
+
 $('save-access-password-btn').addEventListener('click', async () => {
   const password = $('project-access-password').value.trim();
   if (!password || password.length < 4) { toast('Informe uma senha com pelo menos 4 caracteres'); return; }

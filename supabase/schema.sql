@@ -282,31 +282,21 @@ $$;
 grant execute on function set_project_access_password(uuid, text) to authenticated;
 
 -- ---------- Função pública para o portal do cliente ----------
--- Recebe o token único do projeto (share_token) e a senha definida pela
--- equipe, e só devolve os dados se as duas coisas baterem. SECURITY
--- DEFINER contorna o RLS acima de forma controlada, pois o filtro por
--- token + senha está embutido na função.
+-- build_project_json monta o JSON completo do projeto (proposta, compras,
+-- cotações, etapas, pagamentos, recebimentos, documentos) a partir do seu
+-- id. É reaproveitada por duas portas de entrada diferentes:
+--   1. get_project_public(token, senha) — acesso do CLIENTE (anon), valida
+--      token + senha (hash bcrypt) antes de montar o JSON.
+--   2. get_project_public_by_id(project_id) — acesso da EQUIPE (authenticated),
+--      usado pelo botão "Visão do cliente" no painel interno para pré-
+--      visualizar exatamente o que o cliente vê, sem precisar da senha.
 
-create or replace function get_project_public(p_token uuid, p_password text)
+create or replace function build_project_json(p_project_id uuid)
 returns json
-language plpgsql
+language sql
 security definer
 set search_path = public, extensions
 as $$
-declare
-  result json;
-  v_hash text;
-begin
-  select access_password_hash into v_hash from projects where share_token = p_token;
-
-  if v_hash is null then
-    return json_build_object('error', 'invalid_token');
-  end if;
-
-  if p_password is null or crypt(p_password, v_hash) <> v_hash then
-    return json_build_object('error', 'invalid_password');
-  end if;
-
   select json_build_object(
     'project', (
       select json_build_object(
@@ -315,7 +305,7 @@ begin
         'created_at', p.created_at, 'client_name', c.name
       )
       from projects p join clients c on c.id = p.client_id
-      where p.share_token = p_token
+      where p.id = p_project_id
     ),
     'proposal', (
       select json_build_object(
@@ -337,8 +327,7 @@ begin
         )
       )
       from proposals pr
-      join projects p2 on p2.id = pr.project_id
-      where p2.share_token = p_token
+      where pr.project_id = p_project_id
       order by pr.version desc
       limit 1
     ),
@@ -358,8 +347,7 @@ begin
           from documents d where d.purchase_id = pu.id and d.visible_to_client = true
         )
       ) order by pu.priority), '[]'::json)
-      from purchases pu join projects p3 on p3.id = pu.project_id
-      where p3.share_token = p_token
+      from purchases pu where pu.project_id = p_project_id
     ),
     'stages', (
       select coalesce(json_agg(json_build_object(
@@ -369,8 +357,7 @@ begin
         'payment_terms', case when st.billable_to_client then st.payment_terms else null end,
         'billable_to_client', st.billable_to_client
       ) order by st.sequence), '[]'::json)
-      from project_stages st join projects p7 on p7.id = st.project_id
-      where p7.share_token = p_token
+      from project_stages st where st.project_id = p_project_id
     ),
     'purchase_quotes', (
       select coalesce(json_agg(json_build_object(
@@ -388,9 +375,8 @@ begin
       ) order by pu2.priority, pq.price), '[]'::json)
       from purchase_quotes pq
       join purchases pu2 on pu2.id = pq.purchase_id
-      join projects p8 on p8.id = pu2.project_id
       left join suppliers sup2 on sup2.id = pq.supplier_id
-      where p8.share_token = p_token
+      where pu2.project_id = p_project_id
     ),
     'outsourced_services', (
       select coalesce(json_agg(json_build_object(
@@ -407,8 +393,7 @@ begin
           from documents d where d.service_id = os.id and d.visible_to_client = true
         )
       ) order by os.priority), '[]'::json)
-      from outsourced_services os join projects p9 on p9.id = os.project_id
-      where p9.share_token = p_token
+      from outsourced_services os where os.project_id = p_project_id
     ),
     'service_quotes', (
       select coalesce(json_agg(json_build_object(
@@ -425,9 +410,8 @@ begin
       ) order by os2.priority, sq.price), '[]'::json)
       from service_quotes sq
       join outsourced_services os2 on os2.id = sq.service_id
-      join projects p10 on p10.id = os2.project_id
       left join suppliers sup3 on sup3.id = sq.supplier_id
-      where p10.share_token = p_token and os2.billable_to_client = true
+      where os2.project_id = p_project_id and os2.billable_to_client = true
     ),
     'payments', (
       select coalesce(json_agg(json_build_object(
@@ -442,9 +426,8 @@ begin
         )
       ) order by pay.due_date), '[]'::json)
       from payments pay
-      join projects p4 on p4.id = pay.project_id
       left join suppliers sup on sup.id = pay.supplier_id
-      where p4.share_token = p_token
+      where pay.project_id = p_project_id
     ),
     'receivables', (
       select coalesce(json_agg(json_build_object(
@@ -457,27 +440,66 @@ begin
           from documents d where d.receivable_id = r.id and d.visible_to_client = true
         )
       )), '[]'::json)
-      from receivables r join projects p6 on p6.id = r.project_id
-      where p6.share_token = p_token
+      from receivables r where r.project_id = p_project_id
     ),
     'documents', (
       select coalesce(json_agg(json_build_object(
         'file_name', d.file_name, 'storage_path', d.storage_path,
         'category', d.category, 'uploaded_at', d.uploaded_at
       )), '[]'::json)
-      from documents d join projects p5 on p5.id = d.project_id
-      where p5.share_token = p_token and d.visible_to_client = true
+      from documents d
+      where d.project_id = p_project_id and d.visible_to_client = true
         and d.purchase_id is null and d.service_id is null
         and d.purchase_quote_id is null and d.service_quote_id is null
         and d.payment_id is null and d.receivable_id is null
     )
-  ) into result;
+  );
+$$;
 
-  return result;
+-- Acesso do CLIENTE: valida token + senha (hash bcrypt) antes de montar o JSON.
+create or replace function get_project_public(p_token uuid, p_password text)
+returns json
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_project_id uuid;
+  v_hash text;
+begin
+  select id, access_password_hash into v_project_id, v_hash from projects where share_token = p_token;
+
+  if v_hash is null then
+    return json_build_object('error', 'invalid_token');
+  end if;
+
+  if p_password is null or crypt(p_password, v_hash) <> v_hash then
+    return json_build_object('error', 'invalid_password');
+  end if;
+
+  return build_project_json(v_project_id);
 end;
 $$;
 
 grant execute on function get_project_public(uuid, text) to anon;
+
+-- Acesso da EQUIPE: mesmo JSON, sem exigir senha, só para quem estiver
+-- autenticado no painel interno (botão "Visão do cliente").
+create or replace function get_project_public_by_id(p_project_id uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+begin
+  if auth.role() <> 'authenticated' then
+    return json_build_object('error', 'not_authorized');
+  end if;
+  return build_project_json(p_project_id);
+end;
+$$;
+
+grant execute on function get_project_public_by_id(uuid) to authenticated;
 
 -- ---------- Storage ----------
 -- Crie manualmente, no painel Supabase > Storage, um bucket chamado
