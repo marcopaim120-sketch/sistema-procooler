@@ -107,9 +107,15 @@ onde vai o link.
    numa planilha solta, agora num só lugar e visível ao cliente. O sistema
    calcula automaticamente a **economia gerada** (orçado − real) e mostra
    isso tanto no dashboard interno quanto no portal do cliente.
-5. Registre o **cronograma de pagamentos aos fornecedores** em
-   "Pagamentos" — o cliente também vê esse cronograma no portal, para
-   total transparência.
+5. **Importante sobre o dinheiro**: quem paga o fornecedor é o **cliente**,
+   diretamente — a Pro Cooler não intermedia essa grana, só assessora. Por
+   isso existem duas seções separadas:
+   - **"Pagamentos"**: o cronograma do que o cliente paga aos
+     fornecedores (você só acompanha e organiza).
+   - **"Recebimentos"**: o que o cliente paga **para a Pro Cooler** —
+     essa sim é a receita real da empresa (a mão de obra / taxa de
+     assessoria da proposta).
+   O cliente vê as duas coisas no portal, para transparência total.
 6. Envie **documentos** (contrato, projeto técnico, comprovantes, NF) em
    "Documentos", marcando se cada um é visível ao cliente ou não.
 7. O campo de **NF** no projeto guarda só o status (pendente/emitida) e o

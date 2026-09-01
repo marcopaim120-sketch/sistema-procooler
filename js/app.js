@@ -22,7 +22,7 @@ function statusBadge(status) {
 }
 
 // Cache em memória para preencher selects sem refazer query toda hora
-let cache = { clients: [], suppliers: [], projects: [], proposalItems: [] };
+let cache = { clients: [], suppliers: [], projects: [], proposalItems: [], receivables: [] };
 
 // ---------- Autenticação ----------
 $('login-btn').addEventListener('click', async () => {
@@ -69,6 +69,7 @@ async function refreshAll() {
   await loadProjects();
   await loadPurchases();
   await loadPayments();
+  await loadReceivables();
   await loadDocuments();
   await loadDashboard();
   fillProjectSelects();
@@ -76,7 +77,7 @@ async function refreshAll() {
 
 function fillProjectSelects() {
   const opts = cache.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  ['purchase-project', 'payment-project', 'document-project'].forEach(id => {
+  ['purchase-project', 'payment-project', 'receivable-project', 'document-project'].forEach(id => {
     $(id).innerHTML = `<option value="">-</option>` + opts;
   });
   $('project-client').innerHTML = cache.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
@@ -551,6 +552,65 @@ $('save-payment-btn').addEventListener('click', async () => {
 });
 
 // ============================================================
+// RECEBIMENTOS (cliente -> Pro Cooler)
+// ============================================================
+async function loadReceivables() {
+  const { data, error } = await sb.from('receivables').select('*, projects(name)').order('due_date');
+  if (error) { toast(error.message); return; }
+  cache.receivables = data;
+  $('receivables-table').innerHTML = data.map(r => `
+    <tr>
+      <td>${r.projects?.name || ''}</td><td class="num">${brl(r.amount)}</td>
+      <td>${r.due_date || ''}</td><td>${r.paid_date || ''}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="list-actions">
+        <button class="secondary" onclick="editReceivable('${r.id}')">Editar</button>
+        <button class="danger" onclick="deleteRow('receivables', '${r.id}', loadReceivables)">Excluir</button>
+      </td>
+    </tr>`).join('');
+  await loadDashboard();
+}
+
+$('new-receivable-btn').addEventListener('click', () => {
+  $('receivable-id').value = ''; $('receivable-amount').value = '';
+  $('receivable-due').value = ''; $('receivable-paid').value = ''; $('receivable-status').value = 'previsto';
+  $('receivable-method').value = '';
+  $('receivable-form').classList.remove('hidden');
+});
+$('cancel-receivable-btn').addEventListener('click', () => $('receivable-form').classList.add('hidden'));
+
+window.editReceivable = (id) => {
+  const r = cache.receivables.find(x => x.id === id);
+  $('receivable-id').value = r.id;
+  $('receivable-project').value = r.project_id;
+  $('receivable-amount').value = r.amount;
+  $('receivable-due').value = r.due_date || '';
+  $('receivable-paid').value = r.paid_date || '';
+  $('receivable-status').value = r.status;
+  $('receivable-method').value = r.method || '';
+  $('receivable-form').classList.remove('hidden');
+};
+
+$('save-receivable-btn').addEventListener('click', async () => {
+  const id = $('receivable-id').value;
+  const payload = {
+    project_id: $('receivable-project').value,
+    amount: Number($('receivable-amount').value) || 0,
+    due_date: $('receivable-due').value || null,
+    paid_date: $('receivable-paid').value || null,
+    status: $('receivable-status').value,
+    method: $('receivable-method').value.trim()
+  };
+  if (!payload.project_id || !payload.amount) { toast('Informe projeto e valor'); return; }
+  const q = id ? sb.from('receivables').update(payload).eq('id', id) : sb.from('receivables').insert(payload);
+  const { error } = await q;
+  if (error) { toast(error.message); return; }
+  $('receivable-form').classList.add('hidden');
+  await loadReceivables();
+  toast('Recebimento salvo');
+});
+
+// ============================================================
 // DOCUMENTOS
 // ============================================================
 async function loadDocuments() {
@@ -607,6 +667,10 @@ async function loadDashboard() {
   const openPayments = (cache.payments || []).filter(p => p.status === 'previsto' || p.status === 'atrasado')
     .reduce((s, p) => s + (Number(p.amount) || 0), 0);
   $('kpi-open-payments').textContent = brl(openPayments);
+
+  const openReceivables = (cache.receivables || []).filter(r => r.status === 'previsto' || r.status === 'atrasado')
+    .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  $('kpi-open-receivables').textContent = brl(openReceivables);
 
   $('dashboard-projects').innerHTML = cache.projects.slice(0, 8).map(p => `
     <tr><td>${p.name}</td><td>${p.clients?.name || ''}</td><td>${statusBadge(p.status)}</td><td>${statusBadge(p.nf_status)}</td></tr>

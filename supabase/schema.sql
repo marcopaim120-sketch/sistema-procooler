@@ -89,9 +89,25 @@ create table purchases (
   created_at timestamptz not null default now()
 );
 
+-- Pagamentos do CLIENTE ao FORNECEDOR (a Pro Cooler não intermedia esse
+-- dinheiro — só acompanha e organiza, como parte da assessoria de compras).
 create table payments (
   id uuid primary key default gen_random_uuid(),
   purchase_id uuid references purchases(id) on delete cascade,
+  project_id uuid not null references projects(id) on delete cascade,
+  amount numeric(12,2) not null,
+  due_date date,
+  paid_date date,
+  status text not null default 'previsto'
+    check (status in ('previsto','pago','atrasado','cancelado')),
+  method text,
+  notes text
+);
+
+-- Recebimentos do CLIENTE para a PRO COOLER (a receita de verdade da
+-- empresa: a mão de obra / taxa de assessoria cobrada no projeto).
+create table receivables (
+  id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id) on delete cascade,
   amount numeric(12,2) not null,
   due_date date,
@@ -126,6 +142,7 @@ alter table proposal_items enable row level security;
 alter table competitor_quotes enable row level security;
 alter table purchases enable row level security;
 alter table payments enable row level security;
+alter table receivables enable row level security;
 alter table documents enable row level security;
 
 create policy "staff full access" on clients for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -136,6 +153,7 @@ create policy "staff full access" on proposal_items for all using (auth.role() =
 create policy "staff full access" on competitor_quotes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on purchases for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on payments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "staff full access" on receivables for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on documents for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ---------- Senha de acesso do portal do cliente ----------
@@ -230,6 +248,14 @@ begin
       )), '[]'::json)
       from payments pay join projects p4 on p4.id = pay.project_id
       where p4.share_token = p_token
+    ),
+    'receivables', (
+      select coalesce(json_agg(json_build_object(
+        'amount', r.amount, 'due_date', r.due_date,
+        'paid_date', r.paid_date, 'status', r.status
+      )), '[]'::json)
+      from receivables r join projects p6 on p6.id = r.project_id
+      where p6.share_token = p_token
     ),
     'documents', (
       select coalesce(json_agg(json_build_object(

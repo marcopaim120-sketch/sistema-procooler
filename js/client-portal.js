@@ -44,7 +44,7 @@ function showNotFound() {
 
 function render(data) {
   document.getElementById('content').classList.remove('hidden');
-  const { project, proposal, purchases, payments, documents } = data;
+  const { project, proposal, purchases, payments, receivables, documents } = data;
 
   document.getElementById('project-title').textContent = project.name;
   document.getElementById('project-subtitle').textContent = `Cliente: ${project.client_name}`;
@@ -88,10 +88,15 @@ function render(data) {
     <tr><td>${p.description}</td><td>${brl(p.budgeted_cost)}</td><td>${brl(p.actual_cost)}</td><td><span class="badge">${statusLabel[p.status] || p.status}</span></td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma compra registrada ainda.</td></tr>';
 
-  // Pagamentos
+  // Pagamentos (cliente -> fornecedor)
   document.getElementById('payments-list').innerHTML = (payments || []).map(p => `
     <tr><td>${brl(p.amount)}</td><td>${p.due_date || '-'}</td><td>${p.paid_date || '-'}</td><td><span class="badge ${p.status === 'pago' ? 'green' : p.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[p.status] || p.status}</span></td></tr>
   `).join('') || '<tr><td class="muted">Nenhum pagamento programado ainda.</td></tr>';
+
+  // Recebimentos (cliente -> Pro Cooler)
+  document.getElementById('receivables-list').innerHTML = (receivables || []).map(r => `
+    <tr><td>${brl(r.amount)}</td><td>${r.due_date || '-'}</td><td>${r.paid_date || '-'}</td><td><span class="badge ${r.status === 'pago' ? 'green' : r.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[r.status] || r.status}</span></td></tr>
+  `).join('') || '<tr><td class="muted">Nenhum recebimento programado ainda.</td></tr>';
 
   // Documentos
   document.getElementById('documents-list').innerHTML = (documents || []).map(d => {

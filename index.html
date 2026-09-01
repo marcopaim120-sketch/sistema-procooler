@@ -36,7 +36,8 @@
       <a href="#suppliers" data-view="suppliers">Fornecedores</a>
       <a href="#projects" data-view="projects">Projetos &amp; Propostas</a>
       <a href="#purchases" data-view="purchases">Compras</a>
-      <a href="#payments" data-view="payments">Pagamentos</a>
+      <a href="#payments" data-view="payments">Pagamentos (cliente→fornecedor)</a>
+      <a href="#receivables" data-view="receivables">Recebimentos (cliente→Pro Cooler)</a>
       <a href="#documents" data-view="documents">Documentos</a>
     </nav>
     <div class="user-box">
@@ -53,7 +54,8 @@
       <div class="row">
         <div class="card"><div class="muted">Projetos ativos</div><div id="kpi-active-projects" style="font-size:26px;font-weight:700">0</div></div>
         <div class="card"><div class="muted">Economia gerada aos clientes</div><div id="kpi-savings" style="font-size:26px;font-weight:700;color:var(--success)">R$ 0,00</div></div>
-        <div class="card"><div class="muted">Pagamentos em aberto</div><div id="kpi-open-payments" style="font-size:26px;font-weight:700;color:var(--warning)">R$ 0,00</div></div>
+        <div class="card"><div class="muted">Pagamentos em aberto (cliente→fornecedor)</div><div id="kpi-open-payments" style="font-size:26px;font-weight:700;color:var(--warning)">R$ 0,00</div></div>
+        <div class="card"><div class="muted">A receber (cliente→Pro Cooler)</div><div id="kpi-open-receivables" style="font-size:26px;font-weight:700;color:var(--primary)">R$ 0,00</div></div>
       </div>
       <div class="card">
         <h3>Projetos recentes</h3>
@@ -252,7 +254,8 @@
 
     <!-- PAGAMENTOS -->
     <section id="view-payments" class="view">
-      <div class="toolbar"><h2>Pagamentos a fornecedores</h2><button id="new-payment-btn">+ Novo pagamento</button></div>
+      <div class="toolbar"><h2>Pagamentos do cliente aos fornecedores</h2><button id="new-payment-btn">+ Novo pagamento</button></div>
+      <p class="muted">Esse dinheiro passa direto do cliente para o fornecedor — a Pro Cooler não intermedia, só acompanha e organiza como parte da assessoria.</p>
       <div id="payment-form" class="card hidden">
         <div class="row">
           <div class="field"><label>Projeto</label><select id="payment-project"></select></div>
@@ -281,6 +284,38 @@
       <div class="card">
         <table><thead><tr><th>Projeto</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Status</th><th></th></tr></thead>
         <tbody id="payments-table"></tbody></table>
+      </div>
+    </section>
+
+    <!-- RECEBIMENTOS -->
+    <section id="view-receivables" class="view">
+      <div class="toolbar"><h2>Recebimentos (cliente → Pro Cooler)</h2><button id="new-receivable-btn">+ Novo recebimento</button></div>
+      <p class="muted">A receita de verdade da Pro Cooler: o que o cliente paga pelo seu serviço de mão de obra / assessoria (o valor da proposta).</p>
+      <div id="receivable-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Projeto</label><select id="receivable-project"></select></div>
+          <div class="field"><label>Valor (R$)</label><input id="receivable-amount" type="number" step="0.01"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Vencimento</label><input id="receivable-due" type="date"></div>
+          <div class="field"><label>Data de recebimento</label><input id="receivable-paid" type="date"></div>
+          <div class="field"><label>Status</label>
+            <select id="receivable-status">
+              <option value="previsto">Previsto</option>
+              <option value="pago">Pago</option>
+              <option value="atrasado">Atrasado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Método</label><input id="receivable-method" placeholder="Pix, boleto, transferência..."></div>
+        <input type="hidden" id="receivable-id">
+        <button id="save-receivable-btn">Salvar</button>
+        <button class="secondary" id="cancel-receivable-btn">Cancelar</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Projeto</th><th>Valor</th><th>Vencimento</th><th>Recebido em</th><th>Status</th><th></th></tr></thead>
+        <tbody id="receivables-table"></tbody></table>
       </div>
     </section>
 
