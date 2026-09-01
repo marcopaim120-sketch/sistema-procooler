@@ -111,11 +111,24 @@ function render(data) {
     document.getElementById('material-total').textContent = brl(material);
     document.getElementById('labor-total').textContent = brl(labor);
     document.getElementById('proposal-total').textContent = brl(proposalTotal);
-    document.getElementById('compare-new-model').textContent = brl(proposalTotal);
 
-    if (proposal.old_model_price) {
-      document.getElementById('compare-old-model-row').classList.remove('hidden');
-      document.getElementById('compare-old-model').textContent = brl(proposal.old_model_price);
+    const oldPrice = Number(proposal.old_model_price) || 0;
+    if (oldPrice > 0 && proposalTotal > 0) {
+      const diff = oldPrice - proposalTotal;
+      const pct = Math.round((diff / oldPrice) * 100);
+
+      if (diff > 0) {
+        document.getElementById('savings-hero').classList.remove('hidden');
+        document.getElementById('savings-hero-pct').textContent = `${pct}% mais barato`;
+      }
+
+      document.getElementById('compare-bars').classList.remove('hidden');
+      const oldFill = document.getElementById('bar-old-fill');
+      const newFill = document.getElementById('bar-new-fill');
+      oldFill.style.width = '100%';
+      newFill.style.width = Math.max(Math.round((proposalTotal / oldPrice) * 100), 18) + '%';
+      document.getElementById('bar-old-value').textContent = brl(oldPrice);
+      document.getElementById('bar-new-value').textContent = brl(proposalTotal);
     }
 
     if (proposal.competitors && proposal.competitors.length) {

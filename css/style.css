@@ -143,7 +143,36 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   padding: 16px 20px;
   margin-bottom: 18px;
 }
-.savings-box .amount { font-size: 26px; font-weight: 700; color: var(--success); }
+.savings-box .eyebrow {
+  display: inline-block;
+  background: var(--success);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+.savings-box .amount { font-size: 30px; font-weight: 800; color: var(--success); }
+
+.savings-hero { text-align: center; padding: 6px 0 22px; }
+.savings-hero .pct { font-size: 46px; font-weight: 800; color: var(--success); line-height: 1; }
+.savings-hero .label { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+.compare-bars { margin: 6px 0 22px; }
+.compare-bar-row { margin-bottom: 14px; }
+.compare-bar-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; }
+.compare-bar-label strong { font-size: 14px; }
+.compare-bar-track { height: 30px; border-radius: 7px; background: #eef1f4; overflow: hidden; }
+.compare-bar-fill {
+  height: 100%; border-radius: 7px; display: flex; align-items: center;
+  padding-left: 12px; color: #fff; font-weight: 700; font-size: 13px;
+  white-space: nowrap; min-width: fit-content; transition: width 0.6s ease;
+}
+.compare-bar-fill.old { background: #9aa6b2; }
+.compare-bar-fill.new { background: var(--success); }
 
 .share-link {
   display: flex;

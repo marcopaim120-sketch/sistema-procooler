@@ -43,6 +43,7 @@
     </div>
 
     <div class="savings-box">
+      <div class="eyebrow">Economia comprovada</div>
       <div class="muted">Economia gerada com nossa assessoria de compras</div>
       <div class="amount" id="savings-amount">R$ 0,00</div>
       <div class="muted" id="savings-explain"></div>
@@ -51,6 +52,24 @@
 
     <div class="card">
       <h3>Sua proposta comercial</h3>
+      <p class="muted">No modelo Pro Cooler de assessoria, quem paga os fornecedores é você — direto, sem intermediação e sem margem escondida no preço do equipamento. Nós usamos nossa experiência pra negociar o melhor preço em seu nome, e cobramos só pelo nosso trabalho de mão de obra e gestão. O resultado: você sabe exatamente pra onde vai cada real do seu investimento.</p>
+
+      <div id="savings-hero" class="hidden savings-hero">
+        <div class="pct" id="savings-hero-pct"></div>
+        <div class="label">a menos do que pagaria no modelo tradicional (fabricando e vendendo tudo)</div>
+      </div>
+
+      <div id="compare-bars" class="hidden compare-bars">
+        <div class="compare-bar-row">
+          <div class="compare-bar-label"><span>Modelo tradicional</span><strong id="bar-old-value"></strong></div>
+          <div class="compare-bar-track"><div class="compare-bar-fill old" id="bar-old-fill"></div></div>
+        </div>
+        <div class="compare-bar-row">
+          <div class="compare-bar-label"><span>Sua proposta (modelo de assessoria Pro Cooler)</span><strong id="bar-new-value"></strong></div>
+          <div class="compare-bar-track"><div class="compare-bar-fill new" id="bar-new-fill"></div></div>
+        </div>
+      </div>
+
       <div class="row">
         <div><div class="muted">Total em materiais</div><div id="material-total" style="font-weight:700"></div></div>
         <div><div class="muted">Mão de obra</div><div id="labor-total" style="font-weight:700"></div></div>
@@ -58,16 +77,9 @@
       </div>
       <p class="muted" style="margin-top:10px">O detalhamento item a item da proposta está disponível como anexo em "Documentos e anexos", mais abaixo.</p>
 
-      <h4 style="margin-top:20px">Comparativo de preços</h4>
-      <table>
-        <thead><tr><th>Referência</th><th>Valor</th></tr></thead>
-        <tbody>
-          <tr><td><strong>Nossa proposta (modelo de assessoria)</strong></td><td id="compare-new-model" style="font-weight:700;color:var(--primary)"></td></tr>
-          <tr id="compare-old-model-row" class="hidden"><td>Se fosse pelo modelo tradicional (nós fabricando e vendendo tudo)</td><td id="compare-old-model"></td></tr>
-        </tbody>
-      </table>
       <div id="competitors-box" class="hidden" style="margin-top:16px">
         <h4>Comparativo de mercado (concorrentes)</h4>
+        <p class="muted">Pesquisamos o mercado pra você ver com seus próprios olhos onde a Pro Cooler se posiciona.</p>
         <table><thead><tr><th>Concorrente</th><th>Preço</th></tr></thead><tbody id="competitors-list"></tbody></table>
       </div>
     </div>
