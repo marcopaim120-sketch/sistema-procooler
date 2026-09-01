@@ -16,13 +16,14 @@ function statusBadge(status) {
     rascunho: 'blue', enviada: 'amber', aprovada: 'green', recusada: 'red',
     a_cotar: '', cotado: 'green', preparacao: 'amber', andamento: 'blue', realizado: 'green',
     previsto: 'blue', pago: 'green', atrasado: 'red',
-    emitida: 'green', nao_aplicavel: 'blue'
+    emitida: 'green', nao_aplicavel: 'blue', pendente: 'amber',
+    aguardando_proposta: '', recebida: 'blue', em_analise: 'amber', escolhida: 'green'
   };
   return `<span class="badge ${map[status] || ''}">${status.replace('_', ' ')}</span>`;
 }
 
 // Cache em memória para preencher selects sem refazer query toda hora
-let cache = { clients: [], suppliers: [], projects: [], proposalItems: [], receivables: [] };
+let cache = { clients: [], suppliers: [], projects: [], proposalItems: [], receivables: [], stages: [], quotes: [] };
 
 // ---------- Autenticação ----------
 $('login-btn').addEventListener('click', async () => {
@@ -68,6 +69,7 @@ async function refreshAll() {
   await Promise.all([loadClients(), loadSuppliers()]);
   await loadProjects();
   await loadPurchases();
+  await loadStages();
   await loadPayments();
   await loadReceivables();
   await loadDocuments();
@@ -77,11 +79,33 @@ async function refreshAll() {
 
 function fillProjectSelects() {
   const opts = cache.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  ['purchase-project', 'payment-project', 'receivable-project', 'document-project'].forEach(id => {
+  ['purchase-project', 'stage-project', 'payment-project', 'receivable-project', 'document-project'].forEach(id => {
     $(id).innerHTML = `<option value="">-</option>` + opts;
   });
   $('project-client').innerHTML = cache.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-  $('purchase-supplier').innerHTML = `<option value="">-</option>` + cache.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  const supplierOpts = `<option value="">-</option>` + cache.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  $('purchase-supplier').innerHTML = supplierOpts;
+  $('payment-supplier').innerHTML = supplierOpts;
+}
+
+const monthNames = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+function renderMonthlySummary(containerId, rows) {
+  const withDate = (rows || []).filter(r => r.due_date);
+  const byMonth = {};
+  withDate.forEach(r => {
+    const key = r.due_date.slice(0, 7);
+    byMonth[key] = (byMonth[key] || 0) + (Number(r.amount) || 0);
+  });
+  const months = Object.keys(byMonth).sort();
+  let acumulado = 0;
+  const html = months.map(key => {
+    const [year, month] = key.split('-');
+    const label = `${monthNames[Number(month) - 1]}/${year}`;
+    acumulado += byMonth[key];
+    return `<tr><td>${label}</td><td class="num">${brl(byMonth[key])}</td><td class="num">${brl(acumulado)}</td></tr>`;
+  }).join('');
+  $(containerId).innerHTML = html || '<tr><td class="muted">Sem valores com data definida ainda.</td></tr>';
 }
 
 // ============================================================
@@ -273,6 +297,8 @@ async function loadProposal(projectId) {
   $('proposal-status').value = currentProposal.status;
   $('proposal-labor').value = currentProposal.labor_cost;
   $('proposal-discount').value = currentProposal.discount;
+  $('proposal-old-model').value = currentProposal.old_model_price || '';
+  $('proposal-commission').value = currentProposal.commission_pct ?? 20;
   $('proposal-notes').value = currentProposal.notes || '';
   await loadProposalItems();
   await loadCompetitors();
@@ -321,12 +347,24 @@ window.removeProposalItem = async (id) => {
 function updateProposalTotals() {
   const material = cache.proposalItems.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.estimated_unit_cost) || 0), 0);
   const labor = Number($('proposal-labor').value) || 0;
+  const proposalTotal = material + labor - (Number($('proposal-discount').value) || 0);
   $('total-material').textContent = brl(material);
   $('total-labor').textContent = brl(labor);
-  $('total-proposal').textContent = brl(material + labor - (Number($('proposal-discount').value) || 0));
+  $('total-proposal').textContent = brl(proposalTotal);
+
+  const oldModel = Number($('proposal-old-model').value) || 0;
+  $('total-old-model').textContent = brl(oldModel);
+  $('total-vs-old-model').textContent = brl(oldModel ? oldModel - proposalTotal : 0);
+
+  const commissionPct = Number($('proposal-commission').value) || 0;
+  const projectPurchases = currentProject ? (cache.purchases || []).filter(p => p.project_id === currentProject.id) : [];
+  const purchaseSavings = projectPurchases.reduce((s, p) => s + ((Number(p.budgeted_cost) || 0) - (Number(p.actual_cost) || 0)), 0);
+  $('total-commission-preview').textContent = brl(purchaseSavings > 0 ? purchaseSavings * commissionPct / 100 : 0);
 }
 $('proposal-labor').addEventListener('input', updateProposalTotals);
 $('proposal-discount').addEventListener('input', updateProposalTotals);
+$('proposal-old-model').addEventListener('input', updateProposalTotals);
+$('proposal-commission').addEventListener('input', updateProposalTotals);
 
 // ---------- Concorrentes ----------
 async function loadCompetitors() {
@@ -369,6 +407,8 @@ $('save-proposal-btn').addEventListener('click', async () => {
     status: $('proposal-status').value,
     labor_cost: Number($('proposal-labor').value) || 0,
     discount: Number($('proposal-discount').value) || 0,
+    old_model_price: Number($('proposal-old-model').value) || null,
+    commission_pct: Number($('proposal-commission').value) || 0,
     notes: $('proposal-notes').value.trim()
   };
   const { error } = await sb.from('proposals').update(payload).eq('id', currentProposal.id);
@@ -393,18 +433,20 @@ $('save-proposal-btn').addEventListener('click', async () => {
 // COMPRAS
 // ============================================================
 async function loadPurchases() {
-  const { data, error } = await sb.from('purchases').select('*, projects(name), suppliers(name)').order('created_at', { ascending: false });
+  const { data, error } = await sb.from('purchases').select('*, projects(name), suppliers(name)').order('priority');
   if (error) { toast(error.message); return; }
   cache.purchases = data;
   $('purchases-table').innerHTML = data.map(p => {
     const savings = (Number(p.budgeted_cost) || 0) - (Number(p.actual_cost) || 0);
     return `<tr>
+      <td class="num">${p.priority ?? 0}</td>
       <td>${p.projects?.name || ''}</td><td>${p.description}</td><td>${p.suppliers?.name || ''}</td>
       <td class="num">${brl(p.budgeted_cost)}</td><td class="num">${brl(p.actual_cost)}</td>
       <td class="num" style="color:${savings >= 0 ? 'var(--success)' : 'var(--danger)'}">${brl(savings)}</td>
       <td>${p.data_prevista_compra || '-'}</td>
       <td>${statusBadge(p.status)}</td>
       <td class="list-actions">
+        <button class="secondary" onclick="openQuotes('${p.id}')">Cotações</button>
         <button class="secondary" onclick="editPurchase('${p.id}')">Editar</button>
         <button class="danger" onclick="deleteRow('purchases', '${p.id}', loadPurchases)">Excluir</button>
       </td>
@@ -414,13 +456,14 @@ async function loadPurchases() {
 }
 
 $('new-purchase-btn').addEventListener('click', () => {
-  $('purchase-id').value = ''; $('purchase-description').value = '';
+  $('purchase-id').value = ''; $('purchase-description').value = ''; $('purchase-priority').value = '0';
   $('purchase-budgeted').value = ''; $('purchase-actual').value = '';
   $('purchase-date').value = ''; $('purchase-status').value = 'a_cotar';
-  $('purchase-cotacao-date').value = ''; $('purchase-planned-date').value = '';
+  $('purchase-cotacao-date').value = ''; $('purchase-closing-date').value = ''; $('purchase-planned-date').value = '';
   $('purchase-payment-terms').value = ''; $('purchase-notes').value = '';
   $('purchase-proposal-item').innerHTML = '<option value="">-</option>';
   $('purchase-form').classList.remove('hidden');
+  $('quotes-panel').classList.add('hidden');
 });
 $('cancel-purchase-btn').addEventListener('click', () => $('purchase-form').classList.add('hidden'));
 
@@ -445,10 +488,12 @@ window.editPurchase = (id) => {
   $('purchase-project').dispatchEvent(new Event('change'));
   $('purchase-supplier').value = p.supplier_id || '';
   $('purchase-description').value = p.description;
+  $('purchase-priority').value = p.priority ?? 0;
   $('purchase-budgeted').value = p.budgeted_cost;
   $('purchase-actual').value = p.actual_cost;
   $('purchase-date').value = p.purchase_date || '';
   $('purchase-cotacao-date').value = p.data_prevista_cotacao || '';
+  $('purchase-closing-date').value = p.closing_date || '';
   $('purchase-planned-date').value = p.data_prevista_compra || '';
   $('purchase-payment-terms').value = p.forma_pagamento || '';
   $('purchase-notes').value = p.notes || '';
@@ -464,9 +509,11 @@ $('save-purchase-btn').addEventListener('click', async () => {
     proposal_item_id: $('purchase-proposal-item').value || null,
     supplier_id: $('purchase-supplier').value || null,
     description: $('purchase-description').value.trim(),
+    priority: Number($('purchase-priority').value) || 0,
     budgeted_cost: Number($('purchase-budgeted').value) || 0,
     actual_cost: Number($('purchase-actual').value) || 0,
     data_prevista_cotacao: $('purchase-cotacao-date').value || null,
+    closing_date: $('purchase-closing-date').value || null,
     data_prevista_compra: $('purchase-planned-date').value || null,
     purchase_date: $('purchase-date').value || null,
     forma_pagamento: $('purchase-payment-terms').value.trim() || null,
@@ -482,16 +529,95 @@ $('save-purchase-btn').addEventListener('click', async () => {
   toast('Compra salva');
 });
 
+// ---------- Cotações de fornecedores por compra ----------
+let currentQuotesPurchaseId = null;
+const quoteStatusLabel = { aguardando_proposta: 'Aguardando proposta', recebida: 'Recebida', em_analise: 'Em análise', escolhida: 'Escolhida', recusada: 'Recusada' };
+
+window.openQuotes = async (purchaseId) => {
+  currentQuotesPurchaseId = purchaseId;
+  const purchase = cache.purchases.find(p => p.id === purchaseId);
+  $('quotes-panel-title').textContent = `Cotações — ${purchase.description}`;
+  $('purchase-form').classList.add('hidden');
+  $('quotes-panel').classList.remove('hidden');
+  $('quote-supplier').innerHTML = `<option value="">-</option>` + cache.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  $('quote-price').value = ''; $('quote-down-payment').value = ''; $('quote-installments').value = '';
+  $('quote-delivery-date').value = ''; $('quote-status').value = 'aguardando_proposta'; $('quote-notes').value = '';
+  await loadQuotes();
+};
+
+$('close-quotes-panel').addEventListener('click', () => {
+  $('quotes-panel').classList.add('hidden');
+  currentQuotesPurchaseId = null;
+});
+
+async function loadQuotes() {
+  const { data, error } = await sb.from('purchase_quotes').select('*, suppliers(name)').eq('purchase_id', currentQuotesPurchaseId).order('price');
+  if (error) { toast(error.message); return; }
+  cache.quotes = data;
+  $('quotes-table').innerHTML = data.map(q => `
+    <tr>
+      <td>${q.suppliers?.name || '-'}</td><td class="num">${brl(q.price)}</td><td class="num">${brl(q.down_payment)}</td>
+      <td>${q.installments || '-'}</td><td>${q.delivery_date || '-'}</td>
+      <td>${statusBadge(q.status)}</td>
+      <td class="list-actions">
+        ${q.status !== 'escolhida' ? `<button class="secondary" onclick="chooseQuote('${q.id}')">Escolher</button>` : ''}
+        <button class="danger" onclick="deleteQuote('${q.id}')">x</button>
+      </td>
+    </tr>`).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
+}
+
+$('add-quote-btn').addEventListener('click', async () => {
+  const payload = {
+    purchase_id: currentQuotesPurchaseId,
+    supplier_id: $('quote-supplier').value || null,
+    price: Number($('quote-price').value) || null,
+    down_payment: Number($('quote-down-payment').value) || null,
+    installments: $('quote-installments').value.trim() || null,
+    delivery_date: $('quote-delivery-date').value || null,
+    status: $('quote-status').value,
+    notes: $('quote-notes').value.trim() || null
+  };
+  const { error } = await sb.from('purchase_quotes').insert(payload);
+  if (error) { toast(error.message); return; }
+  $('quote-price').value = ''; $('quote-down-payment').value = ''; $('quote-installments').value = '';
+  $('quote-delivery-date').value = ''; $('quote-notes').value = ''; $('quote-status').value = 'aguardando_proposta';
+  await loadQuotes();
+  toast('Cotação adicionada');
+});
+
+window.deleteQuote = async (id) => {
+  if (!confirm('Excluir esta cotação?')) return;
+  await sb.from('purchase_quotes').delete().eq('id', id);
+  await loadQuotes();
+};
+
+window.chooseQuote = async (id) => {
+  const quote = cache.quotes.find(q => q.id === id);
+  if (!confirm('Marcar esta cotação como escolhida? Isso atualiza fornecedor, custo real, forma de pagamento e status da compra.')) return;
+  await sb.from('purchase_quotes').update({ status: 'escolhida' }).eq('id', id);
+  await sb.from('purchases').update({
+    supplier_id: quote.supplier_id,
+    actual_cost: quote.price,
+    forma_pagamento: quote.installments ? `Entrada ${brl(quote.down_payment)} + ${quote.installments}` : null,
+    data_prevista_compra: quote.delivery_date,
+    closing_date: new Date().toISOString().slice(0, 10),
+    status: 'cotado'
+  }).eq('id', currentQuotesPurchaseId);
+  await loadQuotes();
+  await loadPurchases();
+  toast('Cotação escolhida — dados da compra atualizados');
+};
+
 // ============================================================
 // PAGAMENTOS
 // ============================================================
 async function loadPayments() {
-  const { data, error } = await sb.from('payments').select('*, projects(name)').order('due_date');
+  const { data, error } = await sb.from('payments').select('*, projects(name), suppliers(name)').order('due_date');
   if (error) { toast(error.message); return; }
   cache.payments = data;
   $('payments-table').innerHTML = data.map(p => `
     <tr>
-      <td>${p.projects?.name || ''}</td><td class="num">${brl(p.amount)}</td>
+      <td>${p.projects?.name || ''}</td><td>${p.suppliers?.name || ''}</td><td class="num">${brl(p.amount)}</td>
       <td>${p.due_date || ''}</td><td>${p.paid_date || ''}</td>
       <td>${statusBadge(p.status)}</td>
       <td class="list-actions">
@@ -499,11 +625,12 @@ async function loadPayments() {
         <button class="danger" onclick="deleteRow('payments', '${p.id}', loadPayments)">Excluir</button>
       </td>
     </tr>`).join('');
+  renderMonthlySummary('payments-monthly-table', data);
   await loadDashboard();
 }
 
 $('new-payment-btn').addEventListener('click', () => {
-  $('payment-id').value = ''; $('payment-amount').value = '';
+  $('payment-id').value = ''; $('payment-amount').value = ''; $('payment-supplier').value = '';
   $('payment-due').value = ''; $('payment-paid').value = ''; $('payment-status').value = 'previsto';
   $('payment-method').value = ''; $('payment-purchase').innerHTML = '<option value="">-</option>';
   $('payment-form').classList.remove('hidden');
@@ -522,6 +649,7 @@ window.editPayment = (p_id) => {
   $('payment-id').value = p.id;
   $('payment-project').value = p.project_id;
   $('payment-project').dispatchEvent(new Event('change'));
+  $('payment-supplier').value = p.supplier_id || '';
   $('payment-amount').value = p.amount;
   $('payment-due').value = p.due_date || '';
   $('payment-paid').value = p.paid_date || '';
@@ -536,6 +664,7 @@ $('save-payment-btn').addEventListener('click', async () => {
   const payload = {
     project_id: $('payment-project').value,
     purchase_id: $('payment-purchase').value || null,
+    supplier_id: $('payment-supplier').value || null,
     amount: Number($('payment-amount').value) || 0,
     due_date: $('payment-due').value || null,
     paid_date: $('payment-paid').value || null,
@@ -608,6 +737,71 @@ $('save-receivable-btn').addEventListener('click', async () => {
   $('receivable-form').classList.add('hidden');
   await loadReceivables();
   toast('Recebimento salvo');
+});
+
+// ============================================================
+// ETAPAS DE PRODUÇÃO
+// ============================================================
+async function loadStages() {
+  const { data, error } = await sb.from('project_stages').select('*, projects(name)').order('sequence');
+  if (error) { toast(error.message); return; }
+  cache.stages = data;
+  $('stages-table').innerHTML = data.map(s => `
+    <tr>
+      <td class="num">${s.sequence}</td>
+      <td>${s.projects?.name || ''}</td><td>${s.name}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td>${s.billable_to_client ? 'Sim' : 'Não'}</td>
+      <td class="num">${s.billable_to_client ? brl(s.cost) : '-'}</td>
+      <td class="list-actions">
+        <button class="secondary" onclick="editStage('${s.id}')">Editar</button>
+        <button class="danger" onclick="deleteRow('project_stages', '${s.id}', loadStages)">Excluir</button>
+      </td>
+    </tr>`).join('');
+}
+
+$('new-stage-btn').addEventListener('click', () => {
+  $('stage-id').value = ''; $('stage-name').value = ''; $('stage-sequence').value = '0';
+  $('stage-status').value = 'pendente'; $('stage-billable').checked = false;
+  $('stage-cost').value = ''; $('stage-payment-terms').value = ''; $('stage-notes').value = '';
+  $('stage-form').classList.remove('hidden');
+});
+$('cancel-stage-btn').addEventListener('click', () => $('stage-form').classList.add('hidden'));
+
+window.editStage = (id) => {
+  const s = cache.stages.find(x => x.id === id);
+  $('stage-id').value = s.id;
+  $('stage-project').value = s.project_id;
+  $('stage-name').value = s.name;
+  $('stage-sequence').value = s.sequence;
+  $('stage-status').value = s.status;
+  $('stage-billable').checked = s.billable_to_client;
+  $('stage-cost').value = s.cost || '';
+  $('stage-payment-terms').value = s.payment_terms || '';
+  $('stage-notes').value = s.notes || '';
+  $('stage-form').classList.remove('hidden');
+};
+
+$('save-stage-btn').addEventListener('click', async () => {
+  const id = $('stage-id').value;
+  const billable = $('stage-billable').checked;
+  const payload = {
+    project_id: $('stage-project').value,
+    name: $('stage-name').value.trim(),
+    sequence: Number($('stage-sequence').value) || 0,
+    status: $('stage-status').value,
+    billable_to_client: billable,
+    cost: billable ? (Number($('stage-cost').value) || 0) : null,
+    payment_terms: billable ? ($('stage-payment-terms').value.trim() || null) : null,
+    notes: $('stage-notes').value.trim() || null
+  };
+  if (!payload.project_id || !payload.name) { toast('Informe projeto e nome da etapa'); return; }
+  const q = id ? sb.from('project_stages').update(payload).eq('id', id) : sb.from('project_stages').insert(payload);
+  const { error } = await q;
+  if (error) { toast(error.message); return; }
+  $('stage-form').classList.add('hidden');
+  await loadStages();
+  toast('Etapa salva');
 });
 
 // ============================================================

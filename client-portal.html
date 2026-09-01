@@ -46,6 +46,7 @@
       <div class="muted">Economia gerada com nossa assessoria de compras</div>
       <div class="amount" id="savings-amount">R$ 0,00</div>
       <div class="muted" id="savings-explain"></div>
+      <div class="muted" id="commission-explain" style="margin-top:6px"></div>
     </div>
 
     <div class="card">
@@ -59,29 +60,51 @@
         <div><div class="muted">Mão de obra</div><div id="labor-total" style="font-weight:700"></div></div>
         <div><div class="muted">Total da proposta</div><div id="proposal-total" style="font-weight:700;color:var(--primary)"></div></div>
       </div>
+
+      <h4 style="margin-top:20px">Comparativo de preços</h4>
+      <table>
+        <thead><tr><th>Referência</th><th>Valor</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Nossa proposta (modelo de assessoria)</strong></td><td id="compare-new-model" style="font-weight:700;color:var(--primary)"></td></tr>
+          <tr id="compare-old-model-row" class="hidden"><td>Se fosse pelo modelo tradicional (nós fabricando e vendendo tudo)</td><td id="compare-old-model"></td></tr>
+        </tbody>
+      </table>
       <div id="competitors-box" class="hidden" style="margin-top:16px">
-        <h4>Comparativo de mercado</h4>
+        <h4>Comparativo de mercado (concorrentes)</h4>
         <table><thead><tr><th>Concorrente</th><th>Preço</th></tr></thead><tbody id="competitors-list"></tbody></table>
       </div>
+    </div>
+
+    <div class="card">
+      <h3>Etapas de produção</h3>
+      <table>
+        <thead><tr><th>Etapa</th><th>Status</th><th>Valor</th></tr></thead>
+        <tbody id="stages-list"></tbody>
+      </table>
     </div>
 
     <div class="card">
       <h3>Evolução das compras</h3>
       <div class="progress-bar"><div id="purchase-progress" style="width:0%"></div></div>
       <p class="muted" id="purchase-progress-label"></p>
+      <div style="overflow-x:auto">
       <table>
-        <thead><tr><th>Item</th><th>Orçado</th><th>Real</th><th>Status</th></tr></thead>
+        <thead><tr><th>Item</th><th>Orçado</th><th>Real</th><th>Data proposta</th><th>Fechamento</th><th>Prazo entrega</th><th>Cond. pagamento</th><th>Status</th></tr></thead>
         <tbody id="purchases-list"></tbody>
       </table>
+      </div>
     </div>
 
     <div class="card">
       <h3>Cronograma de pagamentos aos fornecedores</h3>
       <p class="muted">Pagamentos que você faz diretamente aos fornecedores (a Pro Cooler não intermedia esse valor, só acompanha).</p>
       <table>
-        <thead><tr><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Status</th></tr></thead>
+        <thead><tr><th>Fornecedor</th><th>Valor</th><th>Condições</th><th>Vencimento</th><th>Pago em</th><th>Status</th></tr></thead>
         <tbody id="payments-list"></tbody>
       </table>
+      <h4 style="margin-top:16px">Total por mês</h4>
+      <table><thead><tr><th>Mês</th><th>Total do mês</th><th>Acumulado</th></tr></thead>
+      <tbody id="payments-monthly-list"></tbody></table>
     </div>
 
     <div class="card">

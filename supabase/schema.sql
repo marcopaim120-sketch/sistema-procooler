@@ -47,6 +47,12 @@ create table proposals (
     check (status in ('rascunho','enviada','aprovada','recusada')),
   labor_cost numeric(12,2) not null default 0,
   discount numeric(12,2) not null default 0,
+  -- Preço "se fosse pelo modelo antigo" (Pro Cooler fabricando e vendendo
+  -- tudo direto, como um concorrente tradicional) — referência para
+  -- mostrar ao cliente o quanto o modelo de assessoria é mais vantajoso.
+  old_model_price numeric(12,2),
+  -- % cobrado sobre a economia gerada (orçado - real) nas compras.
+  commission_pct numeric(5,2) not null default 20,
   notes text,
   sent_at timestamptz,
   approved_at timestamptz,
@@ -77,15 +83,54 @@ create table purchases (
   proposal_item_id uuid references proposal_items(id) on delete set null,
   supplier_id uuid references suppliers(id) on delete set null,
   description text not null,
+  priority int not null default 0,
   budgeted_cost numeric(12,2) not null default 0,
   actual_cost numeric(12,2) not null default 0,
   data_prevista_cotacao date,
   data_prevista_compra date,
   purchase_date date,
+  closing_date date,
   forma_pagamento text,
   notes text,
   status text not null default 'a_cotar'
     check (status in ('a_cotar','cotado','preparacao','andamento','realizado','cancelado')),
+  created_at timestamptz not null default now()
+);
+
+-- Cotações de fornecedores concorrentes para uma mesma compra (material).
+-- Permite comparar 2, 3 ou mais propostas antes de decidir qual fornecedor
+-- vence. Quando uma cotação é marcada "escolhida", seus dados (fornecedor,
+-- preço, prazo, forma de pagamento) alimentam os campos definitivos da
+-- compra correspondente (isso é feito pelo app, não automaticamente aqui).
+create table purchase_quotes (
+  id uuid primary key default gen_random_uuid(),
+  purchase_id uuid not null references purchases(id) on delete cascade,
+  supplier_id uuid references suppliers(id) on delete set null,
+  price numeric(12,2),
+  down_payment numeric(12,2),
+  installments text,
+  delivery_date date,
+  status text not null default 'aguardando_proposta'
+    check (status in ('aguardando_proposta','recebida','em_analise','escolhida','recusada')),
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+-- Etapas de produção do projeto (serviços), em sequência, separadas dos
+-- materiais. Nem toda etapa é cobrada do cliente — quando não é, o
+-- portal do cliente mostra só o nome e o status, sem valor nem detalhe
+-- (billable_to_client controla isso na função pública mais abaixo).
+create table project_stages (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  name text not null,
+  sequence int not null default 0,
+  status text not null default 'pendente'
+    check (status in ('pendente','andamento','concluido')),
+  billable_to_client boolean not null default false,
+  cost numeric(12,2),
+  payment_terms text,
+  notes text,
   created_at timestamptz not null default now()
 );
 
@@ -95,6 +140,7 @@ create table payments (
   id uuid primary key default gen_random_uuid(),
   purchase_id uuid references purchases(id) on delete cascade,
   project_id uuid not null references projects(id) on delete cascade,
+  supplier_id uuid references suppliers(id) on delete set null,
   amount numeric(12,2) not null,
   due_date date,
   paid_date date,
@@ -141,6 +187,8 @@ alter table proposals enable row level security;
 alter table proposal_items enable row level security;
 alter table competitor_quotes enable row level security;
 alter table purchases enable row level security;
+alter table purchase_quotes enable row level security;
+alter table project_stages enable row level security;
 alter table payments enable row level security;
 alter table receivables enable row level security;
 alter table documents enable row level security;
@@ -152,6 +200,8 @@ create policy "staff full access" on proposals for all using (auth.role() = 'aut
 create policy "staff full access" on proposal_items for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on competitor_quotes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on purchases for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "staff full access" on purchase_quotes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "staff full access" on project_stages for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on payments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on receivables for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on documents for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -212,6 +262,7 @@ begin
     'proposal', (
       select json_build_object(
         'id', pr.id, 'labor_cost', pr.labor_cost, 'discount', pr.discount,
+        'old_model_price', pr.old_model_price, 'commission_pct', pr.commission_pct,
         'status', pr.status, 'notes', pr.notes,
         'items', (
           select coalesce(json_agg(json_build_object(
@@ -236,17 +287,35 @@ begin
     'purchases', (
       select coalesce(json_agg(json_build_object(
         'description', pu.description, 'budgeted_cost', pu.budgeted_cost,
-        'actual_cost', pu.actual_cost, 'status', pu.status, 'purchase_date', pu.purchase_date
-      )), '[]'::json)
+        'actual_cost', pu.actual_cost, 'status', pu.status,
+        'data_prevista_cotacao', pu.data_prevista_cotacao,
+        'closing_date', pu.closing_date,
+        'data_prevista_compra', pu.data_prevista_compra,
+        'forma_pagamento', pu.forma_pagamento,
+        'purchase_date', pu.purchase_date
+      ) order by pu.priority), '[]'::json)
       from purchases pu join projects p3 on p3.id = pu.project_id
       where p3.share_token = p_token
+    ),
+    'stages', (
+      select coalesce(json_agg(json_build_object(
+        'name', st.name, 'status', st.status,
+        'cost', case when st.billable_to_client then st.cost else null end,
+        'payment_terms', case when st.billable_to_client then st.payment_terms else null end,
+        'billable_to_client', st.billable_to_client
+      ) order by st.sequence), '[]'::json)
+      from project_stages st join projects p7 on p7.id = st.project_id
+      where p7.share_token = p_token
     ),
     'payments', (
       select coalesce(json_agg(json_build_object(
         'amount', pay.amount, 'due_date', pay.due_date,
-        'paid_date', pay.paid_date, 'status', pay.status
-      )), '[]'::json)
-      from payments pay join projects p4 on p4.id = pay.project_id
+        'paid_date', pay.paid_date, 'status', pay.status,
+        'method', pay.method, 'supplier_name', sup.name
+      ) order by pay.due_date), '[]'::json)
+      from payments pay
+      join projects p4 on p4.id = pay.project_id
+      left join suppliers sup on sup.id = pay.supplier_id
       where p4.share_token = p_token
     ),
     'receivables', (

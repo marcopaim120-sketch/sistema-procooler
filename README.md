@@ -7,6 +7,35 @@ fluxo real da Pro Cooler: projetos de fabricação sob medida de equipamentos
 e estruturas comerciais (vitrines refrigeradas, balcões, confeitaria,
 câmaras frigoríficas etc.) para açougues, padarias e mercados.
 
+## Módulos do sistema
+
+- **Propostas**: material orçado, mão de obra, desconto, comparativo com
+  concorrentes e comparativo com o **preço no modelo antigo** (se a Pro
+  Cooler fabricasse e vendesse tudo direto) — mostra ao cliente o quanto
+  o modelo de assessoria é mais vantajoso. A proposta também define a
+  **% de comissão sobre a economia gerada** nas compras (padrão 20%).
+- **Compras**: por categoria de material, com **prioridade/ordem**,
+  status (a cotar → cotado → preparação → andamento → realizado), datas
+  (proposta, fechamento, prazo de entrega) e **cotações de múltiplos
+  fornecedores** por item (comparar 2, 3 ou mais propostas antes de
+  escolher — ao marcar uma como "escolhida", os dados dela preenchem a
+  compra automaticamente).
+- **Etapas de Produção**: linha do tempo do serviço (corte e laminação →
+  montagem → colocação de peças → acabamento → entrega → instalação
+  etc.), cada uma com status e uma marcação "cobrado do cliente?" — se
+  não for cobrada, o cliente vê só o nome e o status, sem valor.
+- **Pagamentos** (cliente → fornecedor): o cliente paga o fornecedor
+  diretamente, a Pro Cooler só acompanha. Tem fornecedor, condições,
+  datas, parcelas e um resumo **total por mês com acumulado**.
+- **Recebimentos** (cliente → Pro Cooler): a receita real da empresa —
+  mão de obra / taxa de assessoria, incluindo a comissão sobre a
+  economia gerada.
+- **Documentos**: qualquer tipo de arquivo (PDF, imagem etc.), marcando
+  visibilidade ao cliente.
+- **Portal do cliente**: protegido por link + senha, mostra tudo acima de
+  forma transparente (exceto o que não é cobrado dele, que aparece sem
+  valor).
+
 ## Estrutura
 
 - `index.html` — painel interno da equipe (login necessário).

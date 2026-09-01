@@ -36,6 +36,7 @@
       <a href="#suppliers" data-view="suppliers">Fornecedores</a>
       <a href="#projects" data-view="projects">Projetos &amp; Propostas</a>
       <a href="#purchases" data-view="purchases">Compras</a>
+      <a href="#stages" data-view="stages">Etapas de Produção</a>
       <a href="#payments" data-view="payments">Pagamentos (cliente→fornecedor)</a>
       <a href="#receivables" data-view="receivables">Recebimentos (cliente→Pro Cooler)</a>
       <a href="#documents" data-view="documents">Documentos</a>
@@ -182,6 +183,10 @@
             <div class="field"><label>Mão de obra (R$)</label><input id="proposal-labor" type="number" step="0.01"></div>
             <div class="field"><label>Desconto (R$)</label><input id="proposal-discount" type="number" step="0.01"></div>
           </div>
+          <div class="row">
+            <div class="field"><label>Preço no modelo antigo (nosso, se fabricássemos e vendêssemos tudo)</label><input id="proposal-old-model" type="number" step="0.01" placeholder="Referência de comparação"></div>
+            <div class="field"><label>% comissão sobre a economia gerada</label><input id="proposal-commission" type="number" step="0.1" value="20"></div>
+          </div>
           <div class="field"><label>Observações</label><textarea id="proposal-notes" rows="2"></textarea></div>
 
           <h4>Materiais orçados</h4>
@@ -202,7 +207,12 @@
             <div class="row">
               <div><div class="muted">Material orçado</div><div id="total-material" style="font-weight:700">R$ 0,00</div></div>
               <div><div class="muted">Mão de obra</div><div id="total-labor" style="font-weight:700">R$ 0,00</div></div>
-              <div><div class="muted">Total da proposta</div><div id="total-proposal" style="font-weight:700;color:var(--primary)">R$ 0,00</div></div>
+              <div><div class="muted">Total da proposta (modelo novo)</div><div id="total-proposal" style="font-weight:700;color:var(--primary)">R$ 0,00</div></div>
+            </div>
+            <div class="row" style="margin-top:12px">
+              <div><div class="muted">Se fosse modelo antigo (nosso)</div><div id="total-old-model" style="font-weight:700">R$ 0,00</div></div>
+              <div><div class="muted">Economia estimada vs. modelo antigo</div><div id="total-vs-old-model" style="font-weight:700;color:var(--success)">R$ 0,00</div></div>
+              <div><div class="muted">Comissão prevista sobre economia (% definido)</div><div id="total-commission-preview" style="font-weight:700">R$ 0,00</div></div>
             </div>
           </div>
         </div>
@@ -220,12 +230,18 @@
         </div>
         <div class="row">
           <div class="field"><label>Descrição</label><input id="purchase-description"></div>
+          <div class="field"><label>Prioridade (ordem)</label><input id="purchase-priority" type="number" step="1" placeholder="0 = primeiro"></div>
+        </div>
+        <div class="row">
           <div class="field"><label>Custo orçado (R$)</label><input id="purchase-budgeted" type="number" step="0.01"></div>
           <div class="field"><label>Custo real (R$)</label><input id="purchase-actual" type="number" step="0.01"></div>
         </div>
         <div class="row">
-          <div class="field"><label>Data prevista de cotação</label><input id="purchase-cotacao-date" type="date"></div>
-          <div class="field"><label>Data prevista de compra/pagamento</label><input id="purchase-planned-date" type="date"></div>
+          <div class="field"><label>Data da proposta/cotação</label><input id="purchase-cotacao-date" type="date"></div>
+          <div class="field"><label>Data do fechamento (decisão)</label><input id="purchase-closing-date" type="date"></div>
+          <div class="field"><label>Prazo de entrega</label><input id="purchase-planned-date" type="date"></div>
+        </div>
+        <div class="row">
           <div class="field"><label>Data real da compra</label><input id="purchase-date" type="date"></div>
         </div>
         <div class="row">
@@ -247,8 +263,77 @@
         <button class="secondary" id="cancel-purchase-btn">Cancelar</button>
       </div>
       <div class="card">
-        <table><thead><tr><th>Projeto</th><th>Categoria/Item</th><th>Fornecedor</th><th>Orçado</th><th>Real</th><th>Economia</th><th>Previsão compra</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Prior.</th><th>Projeto</th><th>Categoria/Item</th><th>Fornecedor</th><th>Orçado</th><th>Real</th><th>Economia</th><th>Previsão compra</th><th>Status</th><th></th></tr></thead>
         <tbody id="purchases-table"></tbody></table>
+      </div>
+
+      <!-- Cotações de fornecedores concorrentes para uma compra -->
+      <div id="quotes-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="quotes-panel-title">Cotações</h3>
+          <button class="secondary" id="close-quotes-panel">Fechar</button>
+        </div>
+        <table class="items-table">
+          <thead><tr><th>Fornecedor</th><th>Preço</th><th>Entrada</th><th>Parcelas</th><th>Prazo entrega</th><th>Status</th><th></th></tr></thead>
+          <tbody id="quotes-table"></tbody>
+        </table>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label>Fornecedor</label><select id="quote-supplier"></select></div>
+          <div class="field"><label>Preço (R$)</label><input id="quote-price" type="number" step="0.01"></div>
+          <div class="field"><label>Entrada (R$)</label><input id="quote-down-payment" type="number" step="0.01"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Parcelas</label><input id="quote-installments" placeholder="Ex: 3x sem juros"></div>
+          <div class="field"><label>Prazo de entrega</label><input id="quote-delivery-date" type="date"></div>
+          <div class="field"><label>Status</label>
+            <select id="quote-status">
+              <option value="aguardando_proposta">Aguardando proposta</option>
+              <option value="recebida">Recebida</option>
+              <option value="em_analise">Em análise</option>
+              <option value="escolhida">Escolhida</option>
+              <option value="recusada">Recusada</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Observações</label><input id="quote-notes"></div>
+        <button id="add-quote-btn">+ Adicionar cotação</button>
+      </div>
+    </section>
+
+    <!-- ETAPAS DE PRODUÇÃO -->
+    <section id="view-stages" class="view">
+      <div class="toolbar"><h2>Etapas de Produção</h2><button id="new-stage-btn">+ Nova etapa</button></div>
+      <p class="muted">Corte e laminação, montagem, colocação de peças, acabamento, entrega, instalação etc. Marque "cobrado do cliente" só quando o cliente realmente paga por aquela etapa — senão ele vê apenas o nome e o status, sem valor.</p>
+      <div id="stage-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Projeto</label><select id="stage-project"></select></div>
+          <div class="field"><label>Nome da etapa</label><input id="stage-name" placeholder="Ex: Corte e laminação"></div>
+          <div class="field"><label>Sequência (ordem)</label><input id="stage-sequence" type="number" step="1" placeholder="0 = primeira"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Status</label>
+            <select id="stage-status">
+              <option value="pendente">Pendente</option>
+              <option value="andamento">Andamento</option>
+              <option value="concluido">Concluído</option>
+            </select>
+          </div>
+          <div class="field">
+            <label><input type="checkbox" id="stage-billable" style="width:auto;vertical-align:middle"> Cobrado do cliente?</label>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Valor (R$) — só se cobrado</label><input id="stage-cost" type="number" step="0.01"></div>
+          <div class="field"><label>Forma de pagamento — só se cobrado</label><input id="stage-payment-terms" placeholder="Ex: à vista, 2x"></div>
+        </div>
+        <div class="field"><label>Observações (interno)</label><input id="stage-notes"></div>
+        <input type="hidden" id="stage-id">
+        <button id="save-stage-btn">Salvar</button>
+        <button class="secondary" id="cancel-stage-btn">Cancelar</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Ordem</th><th>Projeto</th><th>Etapa</th><th>Status</th><th>Cobrado?</th><th>Valor</th><th></th></tr></thead>
+        <tbody id="stages-table"></tbody></table>
       </div>
     </section>
 
@@ -259,6 +344,7 @@
       <div id="payment-form" class="card hidden">
         <div class="row">
           <div class="field"><label>Projeto</label><select id="payment-project"></select></div>
+          <div class="field"><label>Fornecedor</label><select id="payment-supplier"></select></div>
           <div class="field"><label>Compra (opcional)</label><select id="payment-purchase"></select></div>
         </div>
         <div class="row">
@@ -282,8 +368,13 @@
         <button class="secondary" id="cancel-payment-btn">Cancelar</button>
       </div>
       <div class="card">
-        <table><thead><tr><th>Projeto</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Projeto</th><th>Fornecedor</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Status</th><th></th></tr></thead>
         <tbody id="payments-table"></tbody></table>
+      </div>
+      <div class="card">
+        <h3>Total por mês</h3>
+        <table><thead><tr><th>Mês</th><th>Total do mês</th><th>Acumulado</th></tr></thead>
+        <tbody id="payments-monthly-table"></tbody></table>
       </div>
     </section>
 
