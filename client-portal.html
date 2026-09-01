@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro Cooler — Acompanhamento do projeto</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div id="not-found" class="hidden" style="padding:60px;text-align:center">
+  <h2>Link inválido</h2>
+  <p class="muted">Verifique o link enviado pela nossa equipe ou entre em contato conosco.</p>
+</div>
+
+<div id="content" class="hidden">
+  <div class="public-header">
+    <h1 id="project-title">Projeto</h1>
+    <p id="project-subtitle"></p>
+  </div>
+
+  <div class="main" style="max-width:900px;margin:0 auto">
+
+    <div class="card">
+      <div class="row">
+        <div><div class="muted">Status do projeto</div><div id="status-badge"></div></div>
+        <div><div class="muted">Nota fiscal</div><div id="nf-badge"></div></div>
+      </div>
+    </div>
+
+    <div class="savings-box">
+      <div class="muted">Economia gerada com nossa assessoria de compras</div>
+      <div class="amount" id="savings-amount">R$ 0,00</div>
+      <div class="muted" id="savings-explain"></div>
+    </div>
+
+    <div class="card">
+      <h3>Sua proposta comercial</h3>
+      <table>
+        <thead><tr><th>Material</th><th>Un.</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th></tr></thead>
+        <tbody id="proposal-items"></tbody>
+      </table>
+      <div class="row" style="margin-top:14px">
+        <div><div class="muted">Total em materiais</div><div id="material-total" style="font-weight:700"></div></div>
+        <div><div class="muted">Mão de obra</div><div id="labor-total" style="font-weight:700"></div></div>
+        <div><div class="muted">Total da proposta</div><div id="proposal-total" style="font-weight:700;color:var(--primary)"></div></div>
+      </div>
+      <div id="competitors-box" class="hidden" style="margin-top:16px">
+        <h4>Comparativo de mercado</h4>
+        <table><thead><tr><th>Concorrente</th><th>Preço</th></tr></thead><tbody id="competitors-list"></tbody></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Evolução das compras</h3>
+      <div class="progress-bar"><div id="purchase-progress" style="width:0%"></div></div>
+      <p class="muted" id="purchase-progress-label"></p>
+      <table>
+        <thead><tr><th>Item</th><th>Orçado</th><th>Real</th><th>Status</th></tr></thead>
+        <tbody id="purchases-list"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Cronograma de pagamentos a fornecedores</h3>
+      <table>
+        <thead><tr><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Status</th></tr></thead>
+        <tbody id="payments-list"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Documentos</h3>
+      <table><tbody id="documents-list"></tbody></table>
+    </div>
+
+  </div>
+</div>
+
+<script src="js/supabaseClient.js"></script>
+<script src="js/client-portal.js"></script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pro Cooler — Gestão de Projetos</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen" class="login-screen">
+  <div class="card">
+    <h2>Entrar</h2>
+    <div class="field">
+      <label>E-mail</label>
+      <input id="login-email" type="email" placeholder="voce@empresa.com">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input id="login-password" type="password" placeholder="••••••••">
+    </div>
+    <button id="login-btn" style="width:100%">Entrar</button>
+    <p class="muted" id="login-error" style="color:#c92a2a"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-shell" class="app-shell hidden">
+  <div class="sidebar">
+    <h1>Pro Cooler &middot; Gestão</h1>
+    <nav>
+      <a href="#dashboard" data-view="dashboard">Dashboard</a>
+      <a href="#clients" data-view="clients">Clientes</a>
+      <a href="#suppliers" data-view="suppliers">Fornecedores</a>
+      <a href="#projects" data-view="projects">Projetos &amp; Propostas</a>
+      <a href="#purchases" data-view="purchases">Compras</a>
+      <a href="#payments" data-view="payments">Pagamentos</a>
+      <a href="#documents" data-view="documents">Documentos</a>
+    </nav>
+    <div class="user-box">
+      <div id="user-email"></div>
+      <button id="logout-btn" class="secondary" style="margin-top:10px;width:100%">Sair</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <section id="view-dashboard" class="view">
+      <h2>Dashboard</h2>
+      <div class="row">
+        <div class="card"><div class="muted">Projetos ativos</div><div id="kpi-active-projects" style="font-size:26px;font-weight:700">0</div></div>
+        <div class="card"><div class="muted">Economia gerada aos clientes</div><div id="kpi-savings" style="font-size:26px;font-weight:700;color:var(--success)">R$ 0,00</div></div>
+        <div class="card"><div class="muted">Pagamentos em aberto</div><div id="kpi-open-payments" style="font-size:26px;font-weight:700;color:var(--warning)">R$ 0,00</div></div>
+      </div>
+      <div class="card">
+        <h3>Projetos recentes</h3>
+        <table><thead><tr><th>Projeto</th><th>Cliente</th><th>Status</th><th>NF</th></tr></thead>
+        <tbody id="dashboard-projects"></tbody></table>
+      </div>
+    </section>
+
+    <!-- CLIENTES -->
+    <section id="view-clients" class="view">
+      <div class="toolbar"><h2>Clientes</h2><button id="new-client-btn">+ Novo cliente</button></div>
+      <div id="client-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Nome</label><input id="client-name"></div>
+          <div class="field"><label>E-mail</label><input id="client-email"></div>
+          <div class="field"><label>Telefone</label><input id="client-phone"></div>
+        </div>
+        <div class="field"><label>Observações</label><textarea id="client-notes" rows="2"></textarea></div>
+        <input type="hidden" id="client-id">
+        <button id="save-client-btn">Salvar</button>
+        <button class="secondary" id="cancel-client-btn">Cancelar</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th></th></tr></thead>
+        <tbody id="clients-table"></tbody></table>
+      </div>
+    </section>
+
+    <!-- FORNECEDORES -->
+    <section id="view-suppliers" class="view">
+      <div class="toolbar"><h2>Fornecedores</h2><button id="new-supplier-btn">+ Novo fornecedor</button></div>
+      <div id="supplier-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Nome</label><input id="supplier-name"></div>
+          <div class="field"><label>Contato</label><input id="supplier-contact"></div>
+        </div>
+        <div class="field"><label>Observações</label><textarea id="supplier-notes" rows="2"></textarea></div>
+        <input type="hidden" id="supplier-id">
+        <button id="save-supplier-btn">Salvar</button>
+        <button class="secondary" id="cancel-supplier-btn">Cancelar</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Nome</th><th>Contato</th><th></th></tr></thead>
+        <tbody id="suppliers-table"></tbody></table>
+      </div>
+    </section>
+
+    <!-- PROJETOS / PROPOSTAS -->
+    <section id="view-projects" class="view">
+      <div class="toolbar"><h2>Projetos &amp; Propostas</h2><button id="new-project-btn">+ Novo projeto</button></div>
+
+      <div id="project-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Cliente</label><select id="project-client"></select></div>
+          <div class="field"><label>Nome do projeto</label><input id="project-name" placeholder="Ex: Cozinha planejada - Sr. João"></div>
+          <div class="field"><label>Status</label>
+            <select id="project-status">
+              <option value="orcamento">Orçamento</option>
+              <option value="aprovado">Aprovado</option>
+              <option value="em_producao">Em produção</option>
+              <option value="em_instalacao">Em instalação</option>
+              <option value="concluido">Concluído</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Status da NF</label>
+            <select id="project-nf-status">
+              <option value="pendente">Pendente</option>
+              <option value="emitida">Emitida</option>
+              <option value="nao_aplicavel">Não se aplica</option>
+            </select>
+          </div>
+          <div class="field"><label>Número da NF</label><input id="project-nf-number"></div>
+          <div class="field"><label>Data da NF</label><input id="project-nf-date" type="date"></div>
+        </div>
+        <input type="hidden" id="project-id">
+        <button id="save-project-btn">Salvar</button>
+        <button class="secondary" id="cancel-project-btn">Cancelar</button>
+      </div>
+
+      <div class="card">
+        <table><thead><tr><th>Projeto</th><th>Cliente</th><th>Status</th><th>NF</th><th></th></tr></thead>
+        <tbody id="projects-table"></tbody></table>
+      </div>
+
+      <!-- Detalhe do projeto: proposta -->
+      <div id="project-detail" class="hidden">
+        <div class="card">
+          <div class="toolbar">
+            <h3 id="project-detail-title">Projeto</h3>
+            <button class="secondary" id="close-project-detail">Voltar à lista</button>
+          </div>
+          <div class="share-link">
+            <span>Link do cliente:</span>
+            <input id="project-share-link" readonly>
+            <button class="secondary" id="copy-share-link">Copiar</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="toolbar"><h3>Proposta comercial</h3><button id="save-proposal-btn">Salvar proposta</button></div>
+          <input type="hidden" id="proposal-id">
+          <div class="row">
+            <div class="field"><label>Status da proposta</label>
+              <select id="proposal-status">
+                <option value="rascunho">Rascunho</option>
+                <option value="enviada">Enviada</option>
+                <option value="aprovada">Aprovada</option>
+                <option value="recusada">Recusada</option>
+              </select>
+            </div>
+            <div class="field"><label>Mão de obra (R$)</label><input id="proposal-labor" type="number" step="0.01"></div>
+            <div class="field"><label>Desconto (R$)</label><input id="proposal-discount" type="number" step="0.01"></div>
+          </div>
+          <div class="field"><label>Observações</label><textarea id="proposal-notes" rows="2"></textarea></div>
+
+          <h4>Materiais orçados</h4>
+          <table class="items-table">
+            <thead><tr><th>Descrição</th><th>Un.</th><th>Qtd</th><th>Custo unit. (R$)</th><th>Total</th><th></th></tr></thead>
+            <tbody id="proposal-items-table"></tbody>
+          </table>
+          <button class="secondary" id="add-proposal-item">+ Item de material</button>
+
+          <h4>Comparativo com concorrentes</h4>
+          <table class="items-table">
+            <thead><tr><th>Concorrente</th><th>Preço (R$)</th><th>Observações</th><th></th></tr></thead>
+            <tbody id="competitor-table"></tbody>
+          </table>
+          <button class="secondary" id="add-competitor">+ Concorrente</button>
+
+          <div class="card" style="margin-top:16px;background:#f7f7f8">
+            <div class="row">
+              <div><div class="muted">Material orçado</div><div id="total-material" style="font-weight:700">R$ 0,00</div></div>
+              <div><div class="muted">Mão de obra</div><div id="total-labor" style="font-weight:700">R$ 0,00</div></div>
+              <div><div class="muted">Total da proposta</div><div id="total-proposal" style="font-weight:700;color:var(--primary)">R$ 0,00</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPRAS -->
+    <section id="view-purchases" class="view">
+      <div class="toolbar"><h2>Compras</h2><button id="new-purchase-btn">+ Nova compra</button></div>
+      <div id="purchase-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Projeto</label><select id="purchase-project"></select></div>
+          <div class="field"><label>Item da proposta (opcional)</label><select id="purchase-proposal-item"></select></div>
+          <div class="field"><label>Fornecedor</label><select id="purchase-supplier"></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Descrição</label><input id="purchase-description"></div>
+          <div class="field"><label>Custo orçado (R$)</label><input id="purchase-budgeted" type="number" step="0.01"></div>
+          <div class="field"><label>Custo real (R$)</label><input id="purchase-actual" type="number" step="0.01"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Data prevista de cotação</label><input id="purchase-cotacao-date" type="date"></div>
+          <div class="field"><label>Data prevista de compra/pagamento</label><input id="purchase-planned-date" type="date"></div>
+          <div class="field"><label>Data real da compra</label><input id="purchase-date" type="date"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Forma de pagamento</label><input id="purchase-payment-terms" placeholder="Ex: 1+3, 1+28, 1+30/60"></div>
+          <div class="field"><label>Status</label>
+            <select id="purchase-status">
+              <option value="a_cotar">A cotar</option>
+              <option value="cotado">Cotado</option>
+              <option value="preparacao">Preparação</option>
+              <option value="andamento">Andamento</option>
+              <option value="realizado">Realizado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Observações</label><input id="purchase-notes"></div>
+        <input type="hidden" id="purchase-id">
+        <button id="save-purchase-btn">Salvar</button>
+        <button class="secondary" id="cancel-purchase-btn">Cancelar</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Projeto</th><th>Categoria/Item</th><th>Fornecedor</th><th>Orçado</th><th>Real</th><th>Economia</th><th>Previsão compra</th><th>Status</th><th></th></tr></thead>
+        <tbody id="purchases-table"></tbody></table>
+      </div>
+    </section>
+
+    <!-- PAGAMENTOS -->
+    <section id="view-payments" class="view">
+      <div class="toolbar"><h2>Pagamentos a fornecedores</h2><button id="new-payment-btn">+ Novo pagamento</button></div>
+      <div id="payment-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Projeto</label><select id="payment-project"></select></div>
+          <div class="field"><label>Compra (opcional)</label><select id="payment-purchase"></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Valor (R$)</label><input id="payment-amount" type="number" step="0.01"></div>
+          <div class="field"><label>Vencimento</label><input id="payment-due" type="date"></div>
+          <div class="field"><label>Data de pagamento</label><input id="payment-paid" type="date"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Status</label>
+            <select id="payment-status">
+              <option value="previsto">Previsto</option>
+              <option value="pago">Pago</option>
+              <option value="atrasado">Atrasado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div class="field"><label>Método</label><input id="payment-method" placeholder="Pix, boleto, transferência..."></div>
+        </div>
+        <input type="hidden" id="payment-id">
+        <button id="save-payment-btn">Salvar</button>
+        <button class="secondary" id="cancel-payment-btn">Cancelar</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Projeto</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Status</th><th></th></tr></thead>
+        <tbody id="payments-table"></tbody></table>
+      </div>
+    </section>
+
+    <!-- DOCUMENTOS -->
+    <section id="view-documents" class="view">
+      <div class="toolbar"><h2>Documentos e anexos</h2></div>
+      <div class="card">
+        <div class="row">
+          <div class="field"><label>Projeto</label><select id="document-project"></select></div>
+          <div class="field"><label>Categoria</label>
+            <select id="document-category">
+              <option value="proposta">Proposta</option>
+              <option value="contrato">Contrato</option>
+              <option value="nf">Nota fiscal</option>
+              <option value="comprovante">Comprovante</option>
+              <option value="projeto_tecnico">Projeto técnico</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+          <div class="field"><label>Visível ao cliente</label>
+            <select id="document-visible"><option value="true">Sim</option><option value="false">Não</option></select>
+          </div>
+        </div>
+        <div class="field"><label>Arquivo</label><input id="document-file" type="file"></div>
+        <button id="upload-document-btn">Enviar</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Arquivo</th><th>Projeto</th><th>Categoria</th><th>Visível ao cliente</th><th></th></tr></thead>
+        <tbody id="documents-table"></tbody></table>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="js/supabaseClient.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
