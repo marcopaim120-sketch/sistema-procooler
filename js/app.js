@@ -218,11 +218,25 @@ async function loadProjects() {
       <td>${statusBadge(p.status)}</td><td>${statusBadge(p.nf_status)}</td>
       <td class="list-actions">
         <button class="secondary" onclick="openProject('${p.id}')">Abrir</button>
+        <button class="secondary" onclick="editProject('${p.id}')">Editar</button>
         <button class="secondary" onclick="previewClientView('${p.id}')">👁 Visão do cliente</button>
         <button class="danger" onclick="deleteRow('projects', '${p.id}', loadProjects)">Excluir</button>
       </td>
     </tr>`).join('');
 }
+
+window.editProject = (id) => {
+  const p = cache.projects.find(x => x.id === id);
+  $('project-id').value = p.id;
+  $('project-client').value = p.client_id;
+  $('project-name').value = p.name;
+  $('project-status').value = p.status;
+  $('project-nf-status').value = p.nf_status;
+  $('project-nf-number').value = p.nf_number || '';
+  $('project-nf-date').value = p.nf_date || '';
+  $('project-form').classList.remove('hidden');
+  $('project-detail').classList.add('hidden');
+};
 
 window.previewClientView = (projectId) => {
   const previewUrl = `${location.origin}${location.pathname.replace('index.html', '')}client-portal.html?preview=${projectId}`;
