@@ -36,6 +36,7 @@
       <a href="#suppliers" data-view="suppliers">Fornecedores</a>
       <a href="#projects" data-view="projects">Projetos &amp; Propostas</a>
       <a href="#purchases" data-view="purchases">Compras</a>
+      <a href="#services" data-view="services">Serviços Terceirizados</a>
       <a href="#stages" data-view="stages">Etapas de Produção</a>
       <a href="#payments" data-view="payments">Pagamentos (cliente→fornecedor)</a>
       <a href="#receivables" data-view="receivables">Recebimentos (cliente→Pro Cooler)</a>
@@ -297,6 +298,88 @@
         </div>
         <div class="field"><label>Observações</label><input id="quote-notes"></div>
         <button id="add-quote-btn">+ Adicionar cotação</button>
+      </div>
+    </section>
+
+    <!-- SERVIÇOS TERCEIRIZADOS -->
+    <section id="view-services" class="view">
+      <div class="toolbar"><h2>Serviços Terceirizados</h2><button id="new-service-btn">+ Novo serviço</button></div>
+      <p class="muted">Pintura, corte, laminação e outros serviços feitos por prestadores externos. Marque "cobrado do cliente" quando esse custo é repassado a ele — senão fica visível só como etapa, sem valor.</p>
+      <div id="service-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Projeto</label><select id="service-project"></select></div>
+          <div class="field"><label>Nome do serviço</label><input id="service-name" placeholder="Ex: Pintura, Corte, Laminação"></div>
+          <div class="field"><label>Prestador</label><select id="service-supplier"></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Prioridade (ordem)</label><input id="service-priority" type="number" step="1" placeholder="0 = primeiro"></div>
+          <div class="field">
+            <label><input type="checkbox" id="service-billable" style="width:auto;vertical-align:middle"> Cobrado do cliente?</label>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Custo orçado (R$)</label><input id="service-budgeted" type="number" step="0.01"></div>
+          <div class="field"><label>Custo real (R$)</label><input id="service-actual" type="number" step="0.01"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Data da proposta/cotação</label><input id="service-cotacao-date" type="date"></div>
+          <div class="field"><label>Data do fechamento (decisão)</label><input id="service-closing-date" type="date"></div>
+          <div class="field"><label>Prazo de conclusão</label><input id="service-planned-date" type="date"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Data real de conclusão</label><input id="service-completion-date" type="date"></div>
+          <div class="field"><label>Forma de pagamento</label><input id="service-payment-terms" placeholder="Ex: 1+3, à vista"></div>
+          <div class="field"><label>Status</label>
+            <select id="service-status">
+              <option value="a_cotar">A cotar</option>
+              <option value="cotado">Cotado</option>
+              <option value="preparacao">Preparação</option>
+              <option value="andamento">Andamento</option>
+              <option value="realizado">Realizado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Observações</label><input id="service-notes"></div>
+        <input type="hidden" id="service-id">
+        <button id="save-service-btn">Salvar</button>
+        <button class="secondary" id="cancel-service-btn">Cancelar</button>
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Prior.</th><th>Projeto</th><th>Serviço</th><th>Prestador</th><th>Cobrado?</th><th>Orçado</th><th>Real</th><th>Prazo conclusão</th><th>Status</th><th></th></tr></thead>
+        <tbody id="services-table"></tbody></table>
+      </div>
+
+      <!-- Cotações de prestadores concorrentes para um serviço -->
+      <div id="service-quotes-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="service-quotes-panel-title">Cotações</h3>
+          <button class="secondary" id="close-service-quotes-panel">Fechar</button>
+        </div>
+        <table class="items-table">
+          <thead><tr><th>Prestador</th><th>Preço</th><th>Entrada</th><th>Parcelas</th><th>Prazo conclusão</th><th>Status</th><th></th></tr></thead>
+          <tbody id="service-quotes-table"></tbody>
+        </table>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label>Prestador</label><select id="service-quote-supplier"></select></div>
+          <div class="field"><label>Preço (R$)</label><input id="service-quote-price" type="number" step="0.01"></div>
+          <div class="field"><label>Entrada (R$)</label><input id="service-quote-down-payment" type="number" step="0.01"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Parcelas</label><input id="service-quote-installments" placeholder="Ex: 3x sem juros"></div>
+          <div class="field"><label>Prazo de conclusão</label><input id="service-quote-completion-date" type="date"></div>
+          <div class="field"><label>Status</label>
+            <select id="service-quote-status">
+              <option value="aguardando_proposta">Aguardando proposta</option>
+              <option value="recebida">Recebida</option>
+              <option value="em_analise">Em análise</option>
+              <option value="escolhida">Escolhida</option>
+              <option value="recusada">Recusada</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Observações</label><input id="service-quote-notes"></div>
+        <button id="add-service-quote-btn">+ Adicionar cotação</button>
       </div>
     </section>
 

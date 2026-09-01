@@ -46,7 +46,7 @@ function showNotFound() {
 
 function render(data) {
   document.getElementById('content').classList.remove('hidden');
-  const { project, proposal, purchases, payments, receivables, stages, purchase_quotes, documents } = data;
+  const { project, proposal, purchases, payments, receivables, stages, purchase_quotes, outsourced_services, service_quotes, documents } = data;
 
   document.getElementById('project-title').textContent = project.name;
   document.getElementById('project-subtitle').textContent = `Cliente: ${project.client_name}`;
@@ -78,6 +78,18 @@ function render(data) {
       document.getElementById('competitors-list').innerHTML = proposal.competitors.map(c => `<tr><td>${c.name}</td><td>${brl(c.price)}</td></tr>`).join('');
     }
   }
+
+  // Serviços terceirizados
+  document.getElementById('services-list').innerHTML = (outsourced_services || []).map(s => `
+    <tr><td>${s.name}</td><td>${s.billable_to_client ? brl(s.budgeted_cost) : '-'}</td><td>${s.billable_to_client ? brl(s.actual_cost) : '-'}</td>
+      <td>${s.data_prevista_conclusao || '-'}</td><td>${s.completion_date || '-'}</td>
+      <td><span class="badge">${statusLabel[s.status] || s.status}</span></td></tr>
+  `).join('') || '<tr><td class="muted">Nenhum serviço terceirizado registrado ainda.</td></tr>';
+
+  document.getElementById('service-quotes-list').innerHTML = (service_quotes || []).map(q => `
+    <tr><td>${q.service_name}</td><td>${q.supplier_name || '-'}</td><td>${brl(q.price)}</td><td>${brl(q.down_payment)}</td>
+      <td>${q.installments || '-'}</td><td>${q.completion_date || '-'}</td><td><span class="badge">${statusLabel[q.status] || q.status}</span></td></tr>
+  `).join('') || '<tr><td class="muted">Nenhuma cotação de serviço registrada ainda.</td></tr>';
 
   // Etapas de produção
   document.getElementById('stages-list').innerHTML = (stages || []).map(s => `

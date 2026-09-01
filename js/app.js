@@ -23,7 +23,7 @@ function statusBadge(status) {
 }
 
 // Cache em memória para preencher selects sem refazer query toda hora
-let cache = { clients: [], suppliers: [], projects: [], proposalItems: [], receivables: [], stages: [], quotes: [] };
+let cache = { clients: [], suppliers: [], projects: [], proposalItems: [], receivables: [], stages: [], quotes: [], services: [], serviceQuotes: [] };
 
 // ---------- Autenticação ----------
 $('login-btn').addEventListener('click', async () => {
@@ -69,6 +69,7 @@ async function refreshAll() {
   await Promise.all([loadClients(), loadSuppliers()]);
   await loadProjects();
   await loadPurchases();
+  await loadServices();
   await loadStages();
   await loadPayments();
   await loadReceivables();
@@ -79,13 +80,14 @@ async function refreshAll() {
 
 function fillProjectSelects() {
   const opts = cache.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  ['purchase-project', 'stage-project', 'payment-project', 'receivable-project', 'document-project'].forEach(id => {
+  ['purchase-project', 'service-project', 'stage-project', 'payment-project', 'receivable-project', 'document-project'].forEach(id => {
     $(id).innerHTML = `<option value="">-</option>` + opts;
   });
   $('project-client').innerHTML = cache.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   const supplierOpts = `<option value="">-</option>` + cache.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   $('purchase-supplier').innerHTML = supplierOpts;
   $('payment-supplier').innerHTML = supplierOpts;
+  $('service-supplier').innerHTML = supplierOpts;
 }
 
 const monthNames = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -606,6 +608,167 @@ window.chooseQuote = async (id) => {
   await loadQuotes();
   await loadPurchases();
   toast('Cotação escolhida — dados da compra atualizados');
+};
+
+// ============================================================
+// SERVIÇOS TERCEIRIZADOS
+// ============================================================
+async function loadServices() {
+  const { data, error } = await sb.from('outsourced_services').select('*, projects(name), suppliers(name)').order('priority');
+  if (error) { toast(error.message); return; }
+  cache.services = data;
+  $('services-table').innerHTML = data.map(s => `
+    <tr>
+      <td class="num">${s.priority ?? 0}</td>
+      <td>${s.projects?.name || ''}</td><td>${s.name}</td><td>${s.suppliers?.name || ''}</td>
+      <td>${s.billable_to_client ? 'Sim' : 'Não'}</td>
+      <td class="num">${s.billable_to_client ? brl(s.budgeted_cost) : '-'}</td>
+      <td class="num">${s.billable_to_client ? brl(s.actual_cost) : '-'}</td>
+      <td>${s.data_prevista_conclusao || '-'}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td class="list-actions">
+        <button class="secondary" onclick="openServiceQuotes('${s.id}')">Cotações</button>
+        <button class="secondary" onclick="editService('${s.id}')">Editar</button>
+        <button class="danger" onclick="deleteRow('outsourced_services', '${s.id}', loadServices)">Excluir</button>
+      </td>
+    </tr>`).join('');
+}
+
+$('new-service-btn').addEventListener('click', () => {
+  $('service-id').value = ''; $('service-name').value = ''; $('service-priority').value = '0';
+  $('service-supplier').value = ''; $('service-billable').checked = false;
+  $('service-budgeted').value = ''; $('service-actual').value = '';
+  $('service-cotacao-date').value = ''; $('service-closing-date').value = '';
+  $('service-planned-date').value = ''; $('service-completion-date').value = '';
+  $('service-payment-terms').value = ''; $('service-notes').value = ''; $('service-status').value = 'a_cotar';
+  $('service-form').classList.remove('hidden');
+  $('service-quotes-panel').classList.add('hidden');
+});
+$('cancel-service-btn').addEventListener('click', () => $('service-form').classList.add('hidden'));
+
+window.editService = (id) => {
+  const s = cache.services.find(x => x.id === id);
+  $('service-id').value = s.id;
+  $('service-project').value = s.project_id;
+  $('service-name').value = s.name;
+  $('service-supplier').value = s.supplier_id || '';
+  $('service-priority').value = s.priority ?? 0;
+  $('service-billable').checked = s.billable_to_client;
+  $('service-budgeted').value = s.budgeted_cost;
+  $('service-actual').value = s.actual_cost;
+  $('service-cotacao-date').value = s.data_prevista_cotacao || '';
+  $('service-closing-date').value = s.closing_date || '';
+  $('service-planned-date').value = s.data_prevista_conclusao || '';
+  $('service-completion-date').value = s.completion_date || '';
+  $('service-payment-terms').value = s.forma_pagamento || '';
+  $('service-notes').value = s.notes || '';
+  $('service-status').value = s.status;
+  $('service-form').classList.remove('hidden');
+};
+
+$('save-service-btn').addEventListener('click', async () => {
+  const id = $('service-id').value;
+  const payload = {
+    project_id: $('service-project').value,
+    supplier_id: $('service-supplier').value || null,
+    name: $('service-name').value.trim(),
+    priority: Number($('service-priority').value) || 0,
+    billable_to_client: $('service-billable').checked,
+    budgeted_cost: Number($('service-budgeted').value) || 0,
+    actual_cost: Number($('service-actual').value) || 0,
+    data_prevista_cotacao: $('service-cotacao-date').value || null,
+    closing_date: $('service-closing-date').value || null,
+    data_prevista_conclusao: $('service-planned-date').value || null,
+    completion_date: $('service-completion-date').value || null,
+    forma_pagamento: $('service-payment-terms').value.trim() || null,
+    notes: $('service-notes').value.trim() || null,
+    status: $('service-status').value
+  };
+  if (!payload.project_id || !payload.name) { toast('Informe projeto e nome do serviço'); return; }
+  const q = id ? sb.from('outsourced_services').update(payload).eq('id', id) : sb.from('outsourced_services').insert(payload);
+  const { error } = await q;
+  if (error) { toast(error.message); return; }
+  $('service-form').classList.add('hidden');
+  await loadServices();
+  toast('Serviço salvo');
+});
+
+// ---------- Cotações de prestadores por serviço terceirizado ----------
+let currentServiceQuotesId = null;
+
+window.openServiceQuotes = async (serviceId) => {
+  currentServiceQuotesId = serviceId;
+  const service = cache.services.find(s => s.id === serviceId);
+  $('service-quotes-panel-title').textContent = `Cotações — ${service.name}`;
+  $('service-form').classList.add('hidden');
+  $('service-quotes-panel').classList.remove('hidden');
+  $('service-quote-supplier').innerHTML = `<option value="">-</option>` + cache.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  $('service-quote-price').value = ''; $('service-quote-down-payment').value = ''; $('service-quote-installments').value = '';
+  $('service-quote-completion-date').value = ''; $('service-quote-status').value = 'aguardando_proposta'; $('service-quote-notes').value = '';
+  await loadServiceQuotes();
+};
+
+$('close-service-quotes-panel').addEventListener('click', () => {
+  $('service-quotes-panel').classList.add('hidden');
+  currentServiceQuotesId = null;
+});
+
+async function loadServiceQuotes() {
+  const { data, error } = await sb.from('service_quotes').select('*, suppliers(name)').eq('service_id', currentServiceQuotesId).order('price');
+  if (error) { toast(error.message); return; }
+  cache.serviceQuotes = data;
+  $('service-quotes-table').innerHTML = data.map(q => `
+    <tr>
+      <td>${q.suppliers?.name || '-'}</td><td class="num">${brl(q.price)}</td><td class="num">${brl(q.down_payment)}</td>
+      <td>${q.installments || '-'}</td><td>${q.completion_date || '-'}</td>
+      <td>${statusBadge(q.status)}</td>
+      <td class="list-actions">
+        ${q.status !== 'escolhida' ? `<button class="secondary" onclick="chooseServiceQuote('${q.id}')">Escolher</button>` : ''}
+        <button class="danger" onclick="deleteServiceQuote('${q.id}')">x</button>
+      </td>
+    </tr>`).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
+}
+
+$('add-service-quote-btn').addEventListener('click', async () => {
+  const payload = {
+    service_id: currentServiceQuotesId,
+    supplier_id: $('service-quote-supplier').value || null,
+    price: Number($('service-quote-price').value) || null,
+    down_payment: Number($('service-quote-down-payment').value) || null,
+    installments: $('service-quote-installments').value.trim() || null,
+    completion_date: $('service-quote-completion-date').value || null,
+    status: $('service-quote-status').value,
+    notes: $('service-quote-notes').value.trim() || null
+  };
+  const { error } = await sb.from('service_quotes').insert(payload);
+  if (error) { toast(error.message); return; }
+  $('service-quote-price').value = ''; $('service-quote-down-payment').value = ''; $('service-quote-installments').value = '';
+  $('service-quote-completion-date').value = ''; $('service-quote-notes').value = ''; $('service-quote-status').value = 'aguardando_proposta';
+  await loadServiceQuotes();
+  toast('Cotação adicionada');
+});
+
+window.deleteServiceQuote = async (id) => {
+  if (!confirm('Excluir esta cotação?')) return;
+  await sb.from('service_quotes').delete().eq('id', id);
+  await loadServiceQuotes();
+};
+
+window.chooseServiceQuote = async (id) => {
+  const quote = cache.serviceQuotes.find(q => q.id === id);
+  if (!confirm('Marcar esta cotação como escolhida? Isso atualiza prestador, custo real, forma de pagamento e status do serviço.')) return;
+  await sb.from('service_quotes').update({ status: 'escolhida' }).eq('id', id);
+  await sb.from('outsourced_services').update({
+    supplier_id: quote.supplier_id,
+    actual_cost: quote.price,
+    forma_pagamento: quote.installments ? `Entrada ${brl(quote.down_payment)} + ${quote.installments}` : null,
+    data_prevista_conclusao: quote.completion_date,
+    closing_date: new Date().toISOString().slice(0, 10),
+    status: 'cotado'
+  }).eq('id', currentServiceQuotesId);
+  await loadServiceQuotes();
+  await loadServices();
+  toast('Cotação escolhida — dados do serviço atualizados');
 };
 
 // ============================================================

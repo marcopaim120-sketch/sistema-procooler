@@ -116,6 +116,46 @@ create table purchase_quotes (
   created_at timestamptz not null default now()
 );
 
+-- Serviços TERCEIRIZADOS (pintura, corte, laminação etc. feitos por
+-- prestadores externos) — mesmo fluxo de cotações múltiplas das compras
+-- de material, mas para serviços. billable_to_client controla se esse
+-- custo é repassado ao cliente (visível com valor) ou absorvido pela
+-- Pro Cooler (visível só como etapa, sem valor).
+create table outsourced_services (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  supplier_id uuid references suppliers(id) on delete set null,
+  name text not null,
+  priority int not null default 0,
+  billable_to_client boolean not null default false,
+  budgeted_cost numeric(12,2) not null default 0,
+  actual_cost numeric(12,2) not null default 0,
+  data_prevista_cotacao date,
+  closing_date date,
+  data_prevista_conclusao date,
+  completion_date date,
+  forma_pagamento text,
+  notes text,
+  status text not null default 'a_cotar'
+    check (status in ('a_cotar','cotado','preparacao','andamento','realizado','cancelado')),
+  created_at timestamptz not null default now()
+);
+
+-- Cotações de prestadores concorrentes para um mesmo serviço terceirizado.
+create table service_quotes (
+  id uuid primary key default gen_random_uuid(),
+  service_id uuid not null references outsourced_services(id) on delete cascade,
+  supplier_id uuid references suppliers(id) on delete set null,
+  price numeric(12,2),
+  down_payment numeric(12,2),
+  installments text,
+  completion_date date,
+  status text not null default 'aguardando_proposta'
+    check (status in ('aguardando_proposta','recebida','em_analise','escolhida','recusada')),
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 -- Etapas de produção do projeto (serviços), em sequência, separadas dos
 -- materiais. Nem toda etapa é cobrada do cliente — quando não é, o
 -- portal do cliente mostra só o nome e o status, sem valor nem detalhe
@@ -191,6 +231,8 @@ alter table proposal_items enable row level security;
 alter table competitor_quotes enable row level security;
 alter table purchases enable row level security;
 alter table purchase_quotes enable row level security;
+alter table outsourced_services enable row level security;
+alter table service_quotes enable row level security;
 alter table project_stages enable row level security;
 alter table payments enable row level security;
 alter table receivables enable row level security;
@@ -204,6 +246,8 @@ create policy "staff full access" on proposal_items for all using (auth.role() =
 create policy "staff full access" on competitor_quotes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on purchases for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on purchase_quotes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "staff full access" on outsourced_services for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "staff full access" on service_quotes for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on project_stages for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on payments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on receivables for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -324,6 +368,31 @@ begin
       join projects p8 on p8.id = pu2.project_id
       left join suppliers sup2 on sup2.id = pq.supplier_id
       where p8.share_token = p_token
+    ),
+    'outsourced_services', (
+      select coalesce(json_agg(json_build_object(
+        'name', os.name, 'status', os.status, 'billable_to_client', os.billable_to_client,
+        'budgeted_cost', case when os.billable_to_client then os.budgeted_cost else null end,
+        'actual_cost', case when os.billable_to_client then os.actual_cost else null end,
+        'forma_pagamento', case when os.billable_to_client then os.forma_pagamento else null end,
+        'data_prevista_conclusao', os.data_prevista_conclusao,
+        'completion_date', os.completion_date
+      ) order by os.priority), '[]'::json)
+      from outsourced_services os join projects p9 on p9.id = os.project_id
+      where p9.share_token = p_token
+    ),
+    'service_quotes', (
+      select coalesce(json_agg(json_build_object(
+        'service_name', os2.name, 'supplier_name', sup3.name,
+        'price', sq.price, 'down_payment', sq.down_payment,
+        'installments', sq.installments, 'completion_date', sq.completion_date,
+        'status', sq.status
+      ) order by os2.priority, sq.price), '[]'::json)
+      from service_quotes sq
+      join outsourced_services os2 on os2.id = sq.service_id
+      join projects p10 on p10.id = os2.project_id
+      left join suppliers sup3 on sup3.id = sq.supplier_id
+      where p10.share_token = p_token and os2.billable_to_client = true
     ),
     'payments', (
       select coalesce(json_agg(json_build_object(
