@@ -449,6 +449,7 @@ async function loadPurchases() {
       <td>${statusBadge(p.status)}</td>
       <td class="list-actions">
         <button class="secondary" onclick="openQuotes('${p.id}')">Cotações</button>
+        <button class="secondary" onclick="openPurchaseAttachments('${p.id}')">Anexos</button>
         <button class="secondary" onclick="editPurchase('${p.id}')">Editar</button>
         <button class="danger" onclick="deleteRow('purchases', '${p.id}', loadPurchases)">Excluir</button>
       </td>
@@ -610,6 +611,63 @@ window.chooseQuote = async (id) => {
   toast('Cotação escolhida — dados da compra atualizados');
 };
 
+// ---------- Anexos/comprovantes de uma compra ----------
+let currentAttachPurchaseId = null;
+
+window.openPurchaseAttachments = async (purchaseId) => {
+  currentAttachPurchaseId = purchaseId;
+  const purchase = cache.purchases.find(p => p.id === purchaseId);
+  $('purchase-attach-panel-title').textContent = `Anexos — ${purchase.description}`;
+  $('purchase-form').classList.add('hidden');
+  $('quotes-panel').classList.add('hidden');
+  $('purchase-attach-panel').classList.remove('hidden');
+  $('purchase-attach-file').value = '';
+  await loadPurchaseAttachments();
+};
+
+$('close-purchase-attach-panel').addEventListener('click', () => {
+  $('purchase-attach-panel').classList.add('hidden');
+  currentAttachPurchaseId = null;
+});
+
+async function loadPurchaseAttachments() {
+  const { data, error } = await sb.from('documents').select('*').eq('purchase_id', currentAttachPurchaseId).order('uploaded_at', { ascending: false });
+  if (error) { toast(error.message); return; }
+  $('purchase-attach-table').innerHTML = data.map(d => {
+    const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
+    return `<tr><td><a href="${pub.publicUrl}" target="_blank">${d.file_name}</a></td><td class="muted">${d.visible_to_client ? 'Visível ao cliente' : 'Interno'}</td>
+      <td class="list-actions"><button class="danger" onclick="deletePurchaseAttachment('${d.id}', '${d.storage_path}')">Excluir</button></td></tr>`;
+  }).join('') || '<tr><td class="muted">Nenhum anexo ainda.</td></tr>';
+}
+
+$('purchase-attach-upload-btn').addEventListener('click', async () => {
+  const file = $('purchase-attach-file').files[0];
+  if (!file) { toast('Selecione um arquivo'); return; }
+  const purchase = cache.purchases.find(p => p.id === currentAttachPurchaseId);
+  const path = `${purchase.project_id}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await sb.storage.from('documents').upload(path, file);
+  if (upErr) { toast(upErr.message); return; }
+  const { error } = await sb.from('documents').insert({
+    project_id: purchase.project_id,
+    purchase_id: currentAttachPurchaseId,
+    category: 'comprovante',
+    file_name: file.name,
+    storage_path: path,
+    visible_to_client: $('purchase-attach-visible').value === 'true'
+  });
+  if (error) { toast(error.message); return; }
+  $('purchase-attach-file').value = '';
+  await loadPurchaseAttachments();
+  toast('Anexo enviado');
+});
+
+window.deletePurchaseAttachment = async (id, path) => {
+  if (!confirm('Excluir este anexo?')) return;
+  await sb.storage.from('documents').remove([path]);
+  await sb.from('documents').delete().eq('id', id);
+  await loadPurchaseAttachments();
+};
+
 // ============================================================
 // SERVIÇOS TERCEIRIZADOS
 // ============================================================
@@ -628,6 +686,7 @@ async function loadServices() {
       <td>${statusBadge(s.status)}</td>
       <td class="list-actions">
         <button class="secondary" onclick="openServiceQuotes('${s.id}')">Cotações</button>
+        <button class="secondary" onclick="openServiceAttachments('${s.id}')">Anexos</button>
         <button class="secondary" onclick="editService('${s.id}')">Editar</button>
         <button class="danger" onclick="deleteRow('outsourced_services', '${s.id}', loadServices)">Excluir</button>
       </td>
@@ -769,6 +828,63 @@ window.chooseServiceQuote = async (id) => {
   await loadServiceQuotes();
   await loadServices();
   toast('Cotação escolhida — dados do serviço atualizados');
+};
+
+// ---------- Anexos/comprovantes de um serviço terceirizado ----------
+let currentAttachServiceId = null;
+
+window.openServiceAttachments = async (serviceId) => {
+  currentAttachServiceId = serviceId;
+  const service = cache.services.find(s => s.id === serviceId);
+  $('service-attach-panel-title').textContent = `Anexos — ${service.name}`;
+  $('service-form').classList.add('hidden');
+  $('service-quotes-panel').classList.add('hidden');
+  $('service-attach-panel').classList.remove('hidden');
+  $('service-attach-file').value = '';
+  await loadServiceAttachments();
+};
+
+$('close-service-attach-panel').addEventListener('click', () => {
+  $('service-attach-panel').classList.add('hidden');
+  currentAttachServiceId = null;
+});
+
+async function loadServiceAttachments() {
+  const { data, error } = await sb.from('documents').select('*').eq('service_id', currentAttachServiceId).order('uploaded_at', { ascending: false });
+  if (error) { toast(error.message); return; }
+  $('service-attach-table').innerHTML = data.map(d => {
+    const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
+    return `<tr><td><a href="${pub.publicUrl}" target="_blank">${d.file_name}</a></td><td class="muted">${d.visible_to_client ? 'Visível ao cliente' : 'Interno'}</td>
+      <td class="list-actions"><button class="danger" onclick="deleteServiceAttachment('${d.id}', '${d.storage_path}')">Excluir</button></td></tr>`;
+  }).join('') || '<tr><td class="muted">Nenhum anexo ainda.</td></tr>';
+}
+
+$('service-attach-upload-btn').addEventListener('click', async () => {
+  const file = $('service-attach-file').files[0];
+  if (!file) { toast('Selecione um arquivo'); return; }
+  const service = cache.services.find(s => s.id === currentAttachServiceId);
+  const path = `${service.project_id}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await sb.storage.from('documents').upload(path, file);
+  if (upErr) { toast(upErr.message); return; }
+  const { error } = await sb.from('documents').insert({
+    project_id: service.project_id,
+    service_id: currentAttachServiceId,
+    category: 'comprovante',
+    file_name: file.name,
+    storage_path: path,
+    visible_to_client: $('service-attach-visible').value === 'true'
+  });
+  if (error) { toast(error.message); return; }
+  $('service-attach-file').value = '';
+  await loadServiceAttachments();
+  toast('Anexo enviado');
+});
+
+window.deleteServiceAttachment = async (id, path) => {
+  if (!confirm('Excluir este anexo?')) return;
+  await sb.storage.from('documents').remove([path]);
+  await sb.from('documents').delete().eq('id', id);
+  await loadServiceAttachments();
 };
 
 // ============================================================

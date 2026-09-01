@@ -210,6 +210,12 @@ create table receivables (
 create table documents (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id) on delete cascade,
+  -- Se ligado a uma compra ou serviço específico, o anexo aparece junto
+  -- daquele item (no painel interno e no portal do cliente), não na lista
+  -- geral de Documentos. Deixe os dois nulos para um documento geral do
+  -- projeto (proposta, contrato, NF, planta baixa etc.).
+  purchase_id uuid references purchases(id) on delete cascade,
+  service_id uuid references outsourced_services(id) on delete cascade,
   category text not null default 'outro'
     check (category in ('proposta','contrato','nf','comprovante','projeto_tecnico','outro')),
   file_name text not null,
@@ -339,7 +345,13 @@ begin
         'closing_date', pu.closing_date,
         'data_prevista_compra', pu.data_prevista_compra,
         'forma_pagamento', pu.forma_pagamento,
-        'purchase_date', pu.purchase_date
+        'purchase_date', pu.purchase_date,
+        'documents', (
+          select coalesce(json_agg(json_build_object(
+            'file_name', d.file_name, 'storage_path', d.storage_path
+          )), '[]'::json)
+          from documents d where d.purchase_id = pu.id and d.visible_to_client = true
+        )
       ) order by pu.priority), '[]'::json)
       from purchases pu join projects p3 on p3.id = pu.project_id
       where p3.share_token = p_token
@@ -376,7 +388,13 @@ begin
         'actual_cost', case when os.billable_to_client then os.actual_cost else null end,
         'forma_pagamento', case when os.billable_to_client then os.forma_pagamento else null end,
         'data_prevista_conclusao', os.data_prevista_conclusao,
-        'completion_date', os.completion_date
+        'completion_date', os.completion_date,
+        'documents', (
+          select coalesce(json_agg(json_build_object(
+            'file_name', d.file_name, 'storage_path', d.storage_path
+          )), '[]'::json)
+          from documents d where d.service_id = os.id and d.visible_to_client = true
+        )
       ) order by os.priority), '[]'::json)
       from outsourced_services os join projects p9 on p9.id = os.project_id
       where p9.share_token = p_token
@@ -420,6 +438,7 @@ begin
       )), '[]'::json)
       from documents d join projects p5 on p5.id = d.project_id
       where p5.share_token = p_token and d.visible_to_client = true
+        and d.purchase_id is null and d.service_id is null
     )
   ) into result;
 

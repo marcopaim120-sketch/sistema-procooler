@@ -299,6 +299,22 @@
         <div class="field"><label>Observações</label><input id="quote-notes"></div>
         <button id="add-quote-btn">+ Adicionar cotação</button>
       </div>
+
+      <!-- Anexos/comprovantes específicos de uma compra -->
+      <div id="purchase-attach-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="purchase-attach-panel-title">Anexos</h3>
+          <button class="secondary" id="close-purchase-attach-panel">Fechar</button>
+        </div>
+        <table><tbody id="purchase-attach-table"></tbody></table>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label>Arquivo</label><input id="purchase-attach-file" type="file"></div>
+          <div class="field"><label>Visível ao cliente</label>
+            <select id="purchase-attach-visible"><option value="true">Sim</option><option value="false">Não</option></select>
+          </div>
+          <div style="display:flex;align-items:flex-end"><button id="purchase-attach-upload-btn">Enviar</button></div>
+        </div>
+      </div>
     </section>
 
     <!-- SERVIÇOS TERCEIRIZADOS -->
@@ -380,6 +396,22 @@
         </div>
         <div class="field"><label>Observações</label><input id="service-quote-notes"></div>
         <button id="add-service-quote-btn">+ Adicionar cotação</button>
+      </div>
+
+      <!-- Anexos/comprovantes específicos de um serviço terceirizado -->
+      <div id="service-attach-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="service-attach-panel-title">Anexos</h3>
+          <button class="secondary" id="close-service-attach-panel">Fechar</button>
+        </div>
+        <table><tbody id="service-attach-table"></tbody></table>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label>Arquivo</label><input id="service-attach-file" type="file"></div>
+          <div class="field"><label>Visível ao cliente</label>
+            <select id="service-attach-visible"><option value="true">Sim</option><option value="false">Não</option></select>
+          </div>
+          <div style="display:flex;align-items:flex-end"><button id="service-attach-upload-btn">Enviar</button></div>
+        </div>
       </div>
     </section>
 

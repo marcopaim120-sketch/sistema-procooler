@@ -1,5 +1,13 @@
 const brl = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+function renderDocLinks(docs) {
+  if (!docs || !docs.length) return '-';
+  return docs.map(d => {
+    const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
+    return `<a href="${pub.publicUrl}" target="_blank">${d.file_name}</a>`;
+  }).join('<br>');
+}
+
 const statusLabel = {
   orcamento: 'Orçamento', aprovado: 'Aprovado', em_producao: 'Em produção',
   em_instalacao: 'Em instalação', concluido: 'Concluído', cancelado: 'Cancelado',
@@ -53,14 +61,12 @@ function render(data) {
   document.getElementById('status-badge').innerHTML = `<span class="badge blue">${statusLabel[project.status] || project.status}</span>`;
   document.getElementById('nf-badge').innerHTML = `<span class="badge ${project.nf_status === 'emitida' ? 'green' : 'amber'}">${statusLabel[project.nf_status] || project.nf_status}${project.nf_number ? ' — ' + project.nf_number : ''}</span>`;
 
-  // Proposta
+  // Proposta (só os totais aqui — o detalhamento item a item vai como anexo em Documentos)
   let material = 0;
   if (proposal) {
-    document.getElementById('proposal-items').innerHTML = (proposal.items || []).map(i => {
-      const total = (Number(i.quantity) || 0) * (Number(i.estimated_unit_cost) || 0);
-      material += total;
-      return `<tr><td>${i.description}</td><td>${i.unit}</td><td>${i.quantity}</td><td>${brl(i.estimated_unit_cost)}</td><td>${brl(total)}</td></tr>`;
-    }).join('');
+    (proposal.items || []).forEach(i => {
+      material += (Number(i.quantity) || 0) * (Number(i.estimated_unit_cost) || 0);
+    });
     const labor = Number(proposal.labor_cost) || 0;
     const proposalTotal = material + labor - (Number(proposal.discount) || 0);
     document.getElementById('material-total').textContent = brl(material);
@@ -83,7 +89,7 @@ function render(data) {
   document.getElementById('services-list').innerHTML = (outsourced_services || []).map(s => `
     <tr><td>${s.name}</td><td>${s.billable_to_client ? brl(s.budgeted_cost) : '-'}</td><td>${s.billable_to_client ? brl(s.actual_cost) : '-'}</td>
       <td>${s.data_prevista_conclusao || '-'}</td><td>${s.completion_date || '-'}</td>
-      <td><span class="badge">${statusLabel[s.status] || s.status}</span></td></tr>
+      <td><span class="badge">${statusLabel[s.status] || s.status}</span></td><td>${renderDocLinks(s.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhum serviço terceirizado registrado ainda.</td></tr>';
 
   document.getElementById('service-quotes-list').innerHTML = (service_quotes || []).map(q => `
@@ -127,7 +133,7 @@ function render(data) {
     <tr><td>${p.description}</td><td>${brl(p.budgeted_cost)}</td><td>${brl(p.actual_cost)}</td>
       <td>${p.data_prevista_cotacao || '-'}</td><td>${p.closing_date || '-'}</td>
       <td>${p.data_prevista_compra || '-'}</td><td>${p.forma_pagamento || '-'}</td>
-      <td><span class="badge">${statusLabel[p.status] || p.status}</span></td></tr>
+      <td><span class="badge">${statusLabel[p.status] || p.status}</span></td><td>${renderDocLinks(p.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma compra registrada ainda.</td></tr>';
 
   // Pagamentos (cliente -> fornecedor)
