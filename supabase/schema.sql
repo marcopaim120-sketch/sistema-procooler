@@ -210,14 +210,19 @@ create table receivables (
 create table documents (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id) on delete cascade,
-  -- Se ligado a uma compra ou serviço específico, o anexo aparece junto
-  -- daquele item (no painel interno e no portal do cliente), não na lista
-  -- geral de Documentos. Deixe os dois nulos para um documento geral do
-  -- projeto (proposta, contrato, NF, planta baixa etc.).
+  -- Se ligado a uma compra, cotação, serviço, pagamento ou recebimento
+  -- específico, o anexo aparece junto daquele item (no painel interno e
+  -- no portal do cliente), não na lista geral de Documentos. Deixe todos
+  -- nulos para um documento geral do projeto (proposta detalhada, pedido
+  -- de compra, contrato, NF, planta baixa/projeto técnico etc.).
   purchase_id uuid references purchases(id) on delete cascade,
   service_id uuid references outsourced_services(id) on delete cascade,
+  purchase_quote_id uuid references purchase_quotes(id) on delete cascade,
+  service_quote_id uuid references service_quotes(id) on delete cascade,
+  payment_id uuid references payments(id) on delete cascade,
+  receivable_id uuid references receivables(id) on delete cascade,
   category text not null default 'outro'
-    check (category in ('proposta','contrato','nf','comprovante','projeto_tecnico','outro')),
+    check (category in ('proposta','pedido_compra','contrato','nf','comprovante','projeto_tecnico','outro')),
   file_name text not null,
   storage_path text not null,
   visible_to_client boolean not null default true,
@@ -373,7 +378,13 @@ begin
         'supplier_name', sup2.name,
         'price', pq.price, 'down_payment', pq.down_payment,
         'installments', pq.installments, 'delivery_date', pq.delivery_date,
-        'status', pq.status
+        'status', pq.status,
+        'documents', (
+          select coalesce(json_agg(json_build_object(
+            'file_name', d.file_name, 'storage_path', d.storage_path
+          )), '[]'::json)
+          from documents d where d.purchase_quote_id = pq.id and d.visible_to_client = true
+        )
       ) order by pu2.priority, pq.price), '[]'::json)
       from purchase_quotes pq
       join purchases pu2 on pu2.id = pq.purchase_id
@@ -404,7 +415,13 @@ begin
         'service_name', os2.name, 'supplier_name', sup3.name,
         'price', sq.price, 'down_payment', sq.down_payment,
         'installments', sq.installments, 'completion_date', sq.completion_date,
-        'status', sq.status
+        'status', sq.status,
+        'documents', (
+          select coalesce(json_agg(json_build_object(
+            'file_name', d.file_name, 'storage_path', d.storage_path
+          )), '[]'::json)
+          from documents d where d.service_quote_id = sq.id and d.visible_to_client = true
+        )
       ) order by os2.priority, sq.price), '[]'::json)
       from service_quotes sq
       join outsourced_services os2 on os2.id = sq.service_id
@@ -416,7 +433,13 @@ begin
       select coalesce(json_agg(json_build_object(
         'amount', pay.amount, 'due_date', pay.due_date,
         'paid_date', pay.paid_date, 'status', pay.status,
-        'method', pay.method, 'supplier_name', sup.name
+        'method', pay.method, 'supplier_name', sup.name,
+        'documents', (
+          select coalesce(json_agg(json_build_object(
+            'file_name', d.file_name, 'storage_path', d.storage_path
+          )), '[]'::json)
+          from documents d where d.payment_id = pay.id and d.visible_to_client = true
+        )
       ) order by pay.due_date), '[]'::json)
       from payments pay
       join projects p4 on p4.id = pay.project_id
@@ -426,7 +449,13 @@ begin
     'receivables', (
       select coalesce(json_agg(json_build_object(
         'amount', r.amount, 'due_date', r.due_date,
-        'paid_date', r.paid_date, 'status', r.status
+        'paid_date', r.paid_date, 'status', r.status,
+        'documents', (
+          select coalesce(json_agg(json_build_object(
+            'file_name', d.file_name, 'storage_path', d.storage_path
+          )), '[]'::json)
+          from documents d where d.receivable_id = r.id and d.visible_to_client = true
+        )
       )), '[]'::json)
       from receivables r join projects p6 on p6.id = r.project_id
       where p6.share_token = p_token
@@ -439,6 +468,8 @@ begin
       from documents d join projects p5 on p5.id = d.project_id
       where p5.share_token = p_token and d.visible_to_client = true
         and d.purchase_id is null and d.service_id is null
+        and d.purchase_quote_id is null and d.service_quote_id is null
+        and d.payment_id is null and d.receivable_id is null
     )
   ) into result;
 

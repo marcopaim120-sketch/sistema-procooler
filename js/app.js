@@ -564,6 +564,7 @@ async function loadQuotes() {
       <td>${statusBadge(q.status)}</td>
       <td class="list-actions">
         ${q.status !== 'escolhida' ? `<button class="secondary" onclick="chooseQuote('${q.id}')">Escolher</button>` : ''}
+        <button class="secondary" onclick="openQuoteAttachments('${q.id}')">Anexos</button>
         <button class="danger" onclick="deleteQuote('${q.id}')">x</button>
       </td>
     </tr>`).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
@@ -666,6 +667,61 @@ window.deletePurchaseAttachment = async (id, path) => {
   await sb.storage.from('documents').remove([path]);
   await sb.from('documents').delete().eq('id', id);
   await loadPurchaseAttachments();
+};
+
+// ---------- Anexos de uma cotação de fornecedor ----------
+let currentAttachQuoteId = null;
+
+window.openQuoteAttachments = async (quoteId) => {
+  currentAttachQuoteId = quoteId;
+  const quote = cache.quotes.find(q => q.id === quoteId);
+  $('quote-attach-panel-title').textContent = `Anexos da cotação — ${quote.suppliers?.name || 'fornecedor'}`;
+  $('quote-attach-panel').classList.remove('hidden');
+  $('quote-attach-file').value = '';
+  await loadQuoteAttachments();
+};
+
+$('close-quote-attach-panel').addEventListener('click', () => {
+  $('quote-attach-panel').classList.add('hidden');
+  currentAttachQuoteId = null;
+});
+
+async function loadQuoteAttachments() {
+  const { data, error } = await sb.from('documents').select('*').eq('purchase_quote_id', currentAttachQuoteId).order('uploaded_at', { ascending: false });
+  if (error) { toast(error.message); return; }
+  $('quote-attach-table').innerHTML = data.map(d => {
+    const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
+    return `<tr><td><a href="${pub.publicUrl}" target="_blank">${d.file_name}</a></td><td class="muted">${d.visible_to_client ? 'Visível ao cliente' : 'Interno'}</td>
+      <td class="list-actions"><button class="danger" onclick="deleteQuoteAttachment('${d.id}', '${d.storage_path}')">Excluir</button></td></tr>`;
+  }).join('') || '<tr><td class="muted">Nenhum anexo ainda.</td></tr>';
+}
+
+$('quote-attach-upload-btn').addEventListener('click', async () => {
+  const file = $('quote-attach-file').files[0];
+  if (!file) { toast('Selecione um arquivo'); return; }
+  const purchase = cache.purchases.find(p => p.id === currentQuotesPurchaseId);
+  const path = `${purchase.project_id}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await sb.storage.from('documents').upload(path, file);
+  if (upErr) { toast(upErr.message); return; }
+  const { error } = await sb.from('documents').insert({
+    project_id: purchase.project_id,
+    purchase_quote_id: currentAttachQuoteId,
+    category: 'comprovante',
+    file_name: file.name,
+    storage_path: path,
+    visible_to_client: $('quote-attach-visible').value === 'true'
+  });
+  if (error) { toast(error.message); return; }
+  $('quote-attach-file').value = '';
+  await loadQuoteAttachments();
+  toast('Anexo enviado');
+});
+
+window.deleteQuoteAttachment = async (id, path) => {
+  if (!confirm('Excluir este anexo?')) return;
+  await sb.storage.from('documents').remove([path]);
+  await sb.from('documents').delete().eq('id', id);
+  await loadQuoteAttachments();
 };
 
 // ============================================================
@@ -783,6 +839,7 @@ async function loadServiceQuotes() {
       <td>${statusBadge(q.status)}</td>
       <td class="list-actions">
         ${q.status !== 'escolhida' ? `<button class="secondary" onclick="chooseServiceQuote('${q.id}')">Escolher</button>` : ''}
+        <button class="secondary" onclick="openServiceQuoteAttachments('${q.id}')">Anexos</button>
         <button class="danger" onclick="deleteServiceQuote('${q.id}')">x</button>
       </td>
     </tr>`).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
@@ -887,6 +944,61 @@ window.deleteServiceAttachment = async (id, path) => {
   await loadServiceAttachments();
 };
 
+// ---------- Anexos de uma cotação de prestador ----------
+let currentAttachServiceQuoteId = null;
+
+window.openServiceQuoteAttachments = async (quoteId) => {
+  currentAttachServiceQuoteId = quoteId;
+  const quote = cache.serviceQuotes.find(q => q.id === quoteId);
+  $('service-quote-attach-panel-title').textContent = `Anexos da cotação — ${quote.suppliers?.name || 'prestador'}`;
+  $('service-quote-attach-panel').classList.remove('hidden');
+  $('service-quote-attach-file').value = '';
+  await loadServiceQuoteAttachments();
+};
+
+$('close-service-quote-attach-panel').addEventListener('click', () => {
+  $('service-quote-attach-panel').classList.add('hidden');
+  currentAttachServiceQuoteId = null;
+});
+
+async function loadServiceQuoteAttachments() {
+  const { data, error } = await sb.from('documents').select('*').eq('service_quote_id', currentAttachServiceQuoteId).order('uploaded_at', { ascending: false });
+  if (error) { toast(error.message); return; }
+  $('service-quote-attach-table').innerHTML = data.map(d => {
+    const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
+    return `<tr><td><a href="${pub.publicUrl}" target="_blank">${d.file_name}</a></td><td class="muted">${d.visible_to_client ? 'Visível ao cliente' : 'Interno'}</td>
+      <td class="list-actions"><button class="danger" onclick="deleteServiceQuoteAttachment('${d.id}', '${d.storage_path}')">Excluir</button></td></tr>`;
+  }).join('') || '<tr><td class="muted">Nenhum anexo ainda.</td></tr>';
+}
+
+$('service-quote-attach-upload-btn').addEventListener('click', async () => {
+  const file = $('service-quote-attach-file').files[0];
+  if (!file) { toast('Selecione um arquivo'); return; }
+  const service = cache.services.find(s => s.id === currentServiceQuotesId);
+  const path = `${service.project_id}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await sb.storage.from('documents').upload(path, file);
+  if (upErr) { toast(upErr.message); return; }
+  const { error } = await sb.from('documents').insert({
+    project_id: service.project_id,
+    service_quote_id: currentAttachServiceQuoteId,
+    category: 'comprovante',
+    file_name: file.name,
+    storage_path: path,
+    visible_to_client: $('service-quote-attach-visible').value === 'true'
+  });
+  if (error) { toast(error.message); return; }
+  $('service-quote-attach-file').value = '';
+  await loadServiceQuoteAttachments();
+  toast('Anexo enviado');
+});
+
+window.deleteServiceQuoteAttachment = async (id, path) => {
+  if (!confirm('Excluir este anexo?')) return;
+  await sb.storage.from('documents').remove([path]);
+  await sb.from('documents').delete().eq('id', id);
+  await loadServiceQuoteAttachments();
+};
+
 // ============================================================
 // PAGAMENTOS
 // ============================================================
@@ -901,6 +1013,7 @@ async function loadPayments() {
       <td>${statusBadge(p.status)}</td>
       <td class="list-actions">
         <button class="secondary" onclick="editPayment('${p.id}')">Editar</button>
+        <button class="secondary" onclick="openPaymentAttachments('${p.id}')">Anexos</button>
         <button class="danger" onclick="deleteRow('payments', '${p.id}', loadPayments)">Excluir</button>
       </td>
     </tr>`).join('');
@@ -959,6 +1072,62 @@ $('save-payment-btn').addEventListener('click', async () => {
   toast('Pagamento salvo');
 });
 
+// ---------- Anexos de um pagamento (boleto, comprovante etc.) ----------
+let currentAttachPaymentId = null;
+
+window.openPaymentAttachments = async (paymentId) => {
+  currentAttachPaymentId = paymentId;
+  const payment = cache.payments.find(p => p.id === paymentId);
+  $('payment-attach-panel-title').textContent = `Anexos — pagamento de ${brl(payment.amount)}`;
+  $('payment-form').classList.add('hidden');
+  $('payment-attach-panel').classList.remove('hidden');
+  $('payment-attach-file').value = '';
+  await loadPaymentAttachments();
+};
+
+$('close-payment-attach-panel').addEventListener('click', () => {
+  $('payment-attach-panel').classList.add('hidden');
+  currentAttachPaymentId = null;
+});
+
+async function loadPaymentAttachments() {
+  const { data, error } = await sb.from('documents').select('*').eq('payment_id', currentAttachPaymentId).order('uploaded_at', { ascending: false });
+  if (error) { toast(error.message); return; }
+  $('payment-attach-table').innerHTML = data.map(d => {
+    const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
+    return `<tr><td><a href="${pub.publicUrl}" target="_blank">${d.file_name}</a></td><td class="muted">${d.visible_to_client ? 'Visível ao cliente' : 'Interno'}</td>
+      <td class="list-actions"><button class="danger" onclick="deletePaymentAttachment('${d.id}', '${d.storage_path}')">Excluir</button></td></tr>`;
+  }).join('') || '<tr><td class="muted">Nenhum anexo ainda.</td></tr>';
+}
+
+$('payment-attach-upload-btn').addEventListener('click', async () => {
+  const file = $('payment-attach-file').files[0];
+  if (!file) { toast('Selecione um arquivo'); return; }
+  const payment = cache.payments.find(p => p.id === currentAttachPaymentId);
+  const path = `${payment.project_id}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await sb.storage.from('documents').upload(path, file);
+  if (upErr) { toast(upErr.message); return; }
+  const { error } = await sb.from('documents').insert({
+    project_id: payment.project_id,
+    payment_id: currentAttachPaymentId,
+    category: 'comprovante',
+    file_name: file.name,
+    storage_path: path,
+    visible_to_client: $('payment-attach-visible').value === 'true'
+  });
+  if (error) { toast(error.message); return; }
+  $('payment-attach-file').value = '';
+  await loadPaymentAttachments();
+  toast('Anexo enviado');
+});
+
+window.deletePaymentAttachment = async (id, path) => {
+  if (!confirm('Excluir este anexo?')) return;
+  await sb.storage.from('documents').remove([path]);
+  await sb.from('documents').delete().eq('id', id);
+  await loadPaymentAttachments();
+};
+
 // ============================================================
 // RECEBIMENTOS (cliente -> Pro Cooler)
 // ============================================================
@@ -973,6 +1142,7 @@ async function loadReceivables() {
       <td>${statusBadge(r.status)}</td>
       <td class="list-actions">
         <button class="secondary" onclick="editReceivable('${r.id}')">Editar</button>
+        <button class="secondary" onclick="openReceivableAttachments('${r.id}')">Anexos</button>
         <button class="danger" onclick="deleteRow('receivables', '${r.id}', loadReceivables)">Excluir</button>
       </td>
     </tr>`).join('');
@@ -1017,6 +1187,62 @@ $('save-receivable-btn').addEventListener('click', async () => {
   await loadReceivables();
   toast('Recebimento salvo');
 });
+
+// ---------- Anexos de um recebimento (comprovante do cliente etc.) ----------
+let currentAttachReceivableId = null;
+
+window.openReceivableAttachments = async (receivableId) => {
+  currentAttachReceivableId = receivableId;
+  const receivable = cache.receivables.find(r => r.id === receivableId);
+  $('receivable-attach-panel-title').textContent = `Anexos — recebimento de ${brl(receivable.amount)}`;
+  $('receivable-form').classList.add('hidden');
+  $('receivable-attach-panel').classList.remove('hidden');
+  $('receivable-attach-file').value = '';
+  await loadReceivableAttachments();
+};
+
+$('close-receivable-attach-panel').addEventListener('click', () => {
+  $('receivable-attach-panel').classList.add('hidden');
+  currentAttachReceivableId = null;
+});
+
+async function loadReceivableAttachments() {
+  const { data, error } = await sb.from('documents').select('*').eq('receivable_id', currentAttachReceivableId).order('uploaded_at', { ascending: false });
+  if (error) { toast(error.message); return; }
+  $('receivable-attach-table').innerHTML = data.map(d => {
+    const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
+    return `<tr><td><a href="${pub.publicUrl}" target="_blank">${d.file_name}</a></td><td class="muted">${d.visible_to_client ? 'Visível ao cliente' : 'Interno'}</td>
+      <td class="list-actions"><button class="danger" onclick="deleteReceivableAttachment('${d.id}', '${d.storage_path}')">Excluir</button></td></tr>`;
+  }).join('') || '<tr><td class="muted">Nenhum anexo ainda.</td></tr>';
+}
+
+$('receivable-attach-upload-btn').addEventListener('click', async () => {
+  const file = $('receivable-attach-file').files[0];
+  if (!file) { toast('Selecione um arquivo'); return; }
+  const receivable = cache.receivables.find(r => r.id === currentAttachReceivableId);
+  const path = `${receivable.project_id}/${Date.now()}-${file.name}`;
+  const { error: upErr } = await sb.storage.from('documents').upload(path, file);
+  if (upErr) { toast(upErr.message); return; }
+  const { error } = await sb.from('documents').insert({
+    project_id: receivable.project_id,
+    receivable_id: currentAttachReceivableId,
+    category: 'comprovante',
+    file_name: file.name,
+    storage_path: path,
+    visible_to_client: $('receivable-attach-visible').value === 'true'
+  });
+  if (error) { toast(error.message); return; }
+  $('receivable-attach-file').value = '';
+  await loadReceivableAttachments();
+  toast('Anexo enviado');
+});
+
+window.deleteReceivableAttachment = async (id, path) => {
+  if (!confirm('Excluir este anexo?')) return;
+  await sb.storage.from('documents').remove([path]);
+  await sb.from('documents').delete().eq('id', id);
+  await loadReceivableAttachments();
+};
 
 // ============================================================
 // ETAPAS DE PRODUÇÃO

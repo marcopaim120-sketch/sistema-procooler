@@ -94,7 +94,8 @@ function render(data) {
 
   document.getElementById('service-quotes-list').innerHTML = (service_quotes || []).map(q => `
     <tr><td>${q.service_name}</td><td>${q.supplier_name || '-'}</td><td>${brl(q.price)}</td><td>${brl(q.down_payment)}</td>
-      <td>${q.installments || '-'}</td><td>${q.completion_date || '-'}</td><td><span class="badge">${statusLabel[q.status] || q.status}</span></td></tr>
+      <td>${q.installments || '-'}</td><td>${q.completion_date || '-'}</td><td><span class="badge">${statusLabel[q.status] || q.status}</span></td>
+      <td>${renderDocLinks(q.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma cotação de serviço registrada ainda.</td></tr>';
 
   // Etapas de produção
@@ -106,7 +107,8 @@ function render(data) {
   // Cotações de fornecedores comparadas
   document.getElementById('quotes-list').innerHTML = (purchase_quotes || []).map(q => `
     <tr><td>${q.purchase_description}</td><td>${q.supplier_name || '-'}</td><td>${brl(q.price)}</td><td>${brl(q.down_payment)}</td>
-      <td>${q.installments || '-'}</td><td>${q.delivery_date || '-'}</td><td><span class="badge">${statusLabel[q.status] || q.status}</span></td></tr>
+      <td>${q.installments || '-'}</td><td>${q.delivery_date || '-'}</td><td><span class="badge">${statusLabel[q.status] || q.status}</span></td>
+      <td>${renderDocLinks(q.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
 
   // Compras / economia
@@ -138,13 +140,15 @@ function render(data) {
 
   // Pagamentos (cliente -> fornecedor)
   document.getElementById('payments-list').innerHTML = (payments || []).map(p => `
-    <tr><td>${p.supplier_name || '-'}</td><td>${brl(p.amount)}</td><td>${p.method || '-'}</td><td>${p.due_date || '-'}</td><td>${p.paid_date || '-'}</td><td><span class="badge ${p.status === 'pago' ? 'green' : p.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[p.status] || p.status}</span></td></tr>
+    <tr><td>${p.supplier_name || '-'}</td><td>${brl(p.amount)}</td><td>${p.method || '-'}</td><td>${p.due_date || '-'}</td><td>${p.paid_date || '-'}</td><td><span class="badge ${p.status === 'pago' ? 'green' : p.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[p.status] || p.status}</span></td>
+      <td>${renderDocLinks(p.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhum pagamento programado ainda.</td></tr>';
   renderMonthlySummary('payments-monthly-list', payments || []);
 
   // Recebimentos (cliente -> Pro Cooler)
   document.getElementById('receivables-list').innerHTML = (receivables || []).map(r => `
-    <tr><td>${brl(r.amount)}</td><td>${r.due_date || '-'}</td><td>${r.paid_date || '-'}</td><td><span class="badge ${r.status === 'pago' ? 'green' : r.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[r.status] || r.status}</span></td></tr>
+    <tr><td>${brl(r.amount)}</td><td>${r.due_date || '-'}</td><td>${r.paid_date || '-'}</td><td><span class="badge ${r.status === 'pago' ? 'green' : r.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[r.status] || r.status}</span></td>
+      <td>${renderDocLinks(r.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhum recebimento programado ainda.</td></tr>';
 
   // Documentos, agrupados por categoria (planta baixa/projeto técnico por último)

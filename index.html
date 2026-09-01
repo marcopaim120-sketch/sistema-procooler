@@ -300,6 +300,22 @@
         <button id="add-quote-btn">+ Adicionar cotação</button>
       </div>
 
+      <!-- Anexos de uma cotação de fornecedor específica -->
+      <div id="quote-attach-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="quote-attach-panel-title">Anexos da cotação</h3>
+          <button class="secondary" id="close-quote-attach-panel">Fechar</button>
+        </div>
+        <table><tbody id="quote-attach-table"></tbody></table>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label>Arquivo</label><input id="quote-attach-file" type="file"></div>
+          <div class="field"><label>Visível ao cliente</label>
+            <select id="quote-attach-visible"><option value="true">Sim</option><option value="false">Não</option></select>
+          </div>
+          <div style="display:flex;align-items:flex-end"><button id="quote-attach-upload-btn">Enviar</button></div>
+        </div>
+      </div>
+
       <!-- Anexos/comprovantes específicos de uma compra -->
       <div id="purchase-attach-panel" class="card hidden">
         <div class="toolbar">
@@ -396,6 +412,22 @@
         </div>
         <div class="field"><label>Observações</label><input id="service-quote-notes"></div>
         <button id="add-service-quote-btn">+ Adicionar cotação</button>
+      </div>
+
+      <!-- Anexos de uma cotação de prestador específica -->
+      <div id="service-quote-attach-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="service-quote-attach-panel-title">Anexos da cotação</h3>
+          <button class="secondary" id="close-service-quote-attach-panel">Fechar</button>
+        </div>
+        <table><tbody id="service-quote-attach-table"></tbody></table>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label>Arquivo</label><input id="service-quote-attach-file" type="file"></div>
+          <div class="field"><label>Visível ao cliente</label>
+            <select id="service-quote-attach-visible"><option value="true">Sim</option><option value="false">Não</option></select>
+          </div>
+          <div style="display:flex;align-items:flex-end"><button id="service-quote-attach-upload-btn">Enviar</button></div>
+        </div>
       </div>
 
       <!-- Anexos/comprovantes específicos de um serviço terceirizado -->
@@ -496,6 +528,22 @@
         <table><thead><tr><th>Mês</th><th>Total do mês</th><th>Acumulado</th></tr></thead>
         <tbody id="payments-monthly-table"></tbody></table>
       </div>
+
+      <!-- Anexos de um pagamento específico (boleto, comprovante etc.) -->
+      <div id="payment-attach-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="payment-attach-panel-title">Anexos</h3>
+          <button class="secondary" id="close-payment-attach-panel">Fechar</button>
+        </div>
+        <table><tbody id="payment-attach-table"></tbody></table>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label>Arquivo</label><input id="payment-attach-file" type="file"></div>
+          <div class="field"><label>Visível ao cliente</label>
+            <select id="payment-attach-visible"><option value="true">Sim</option><option value="false">Não</option></select>
+          </div>
+          <div style="display:flex;align-items:flex-end"><button id="payment-attach-upload-btn">Enviar</button></div>
+        </div>
+      </div>
     </section>
 
     <!-- RECEBIMENTOS -->
@@ -528,21 +576,38 @@
         <table><thead><tr><th>Projeto</th><th>Valor</th><th>Vencimento</th><th>Recebido em</th><th>Status</th><th></th></tr></thead>
         <tbody id="receivables-table"></tbody></table>
       </div>
+
+      <!-- Anexos de um recebimento específico (comprovante do cliente etc.) -->
+      <div id="receivable-attach-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="receivable-attach-panel-title">Anexos</h3>
+          <button class="secondary" id="close-receivable-attach-panel">Fechar</button>
+        </div>
+        <table><tbody id="receivable-attach-table"></tbody></table>
+        <div class="row" style="margin-top:12px">
+          <div class="field"><label>Arquivo</label><input id="receivable-attach-file" type="file"></div>
+          <div class="field"><label>Visível ao cliente</label>
+            <select id="receivable-attach-visible"><option value="true">Sim</option><option value="false">Não</option></select>
+          </div>
+          <div style="display:flex;align-items:flex-end"><button id="receivable-attach-upload-btn">Enviar</button></div>
+        </div>
+      </div>
     </section>
 
     <!-- DOCUMENTOS -->
     <section id="view-documents" class="view">
       <div class="toolbar"><h2>Documentos e anexos</h2></div>
+      <p class="muted">Aqui ficam a proposta detalhada, o pedido de compra e os projetos/detalhes técnicos do projeto. Comprovantes de compras, cotações, serviços, pagamentos e recebimentos ficam anexados direto em cada lançamento, nas telas respectivas.</p>
       <div class="card">
         <div class="row">
           <div class="field"><label>Projeto</label><select id="document-project"></select></div>
           <div class="field"><label>Categoria</label>
             <select id="document-category">
-              <option value="proposta">Proposta</option>
+              <option value="proposta">Proposta detalhada</option>
+              <option value="pedido_compra">Pedido de compra</option>
               <option value="contrato">Contrato</option>
               <option value="nf">Nota fiscal</option>
-              <option value="comprovante">Comprovante</option>
-              <option value="projeto_tecnico">Projeto técnico</option>
+              <option value="projeto_tecnico">Projeto técnico / planta baixa</option>
               <option value="outro">Outro</option>
             </select>
           </div>
