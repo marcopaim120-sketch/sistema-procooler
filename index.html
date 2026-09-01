@@ -42,6 +42,7 @@
       <a href="#payments" data-view="payments">Pagamentos (cliente→fornecedor)</a>
       <a href="#receivables" data-view="receivables">Recebimentos (cliente→Pro Cooler)</a>
       <a href="#documents" data-view="documents">Documentos</a>
+      <a href="#client-preview" data-view="client-preview">👁 Visão do cliente</a>
     </nav>
     <div class="user-box">
       <div id="user-email"></div>
@@ -623,6 +624,16 @@
       <div class="card">
         <table><thead><tr><th>Arquivo</th><th>Projeto</th><th>Categoria</th><th>Visível ao cliente</th><th></th></tr></thead>
         <tbody id="documents-table"></tbody></table>
+      </div>
+    </section>
+
+    <!-- VISÃO DO CLIENTE -->
+    <section id="view-client-preview" class="view">
+      <div class="toolbar"><h2>👁 Visão do cliente</h2></div>
+      <p class="muted">Escolha um projeto e veja exatamente o que o cliente enxerga no portal dele — com um aviso de pré-visualização, sem precisar da senha de acesso.</p>
+      <div class="card">
+        <div class="field"><label>Projeto</label><select id="client-preview-project"></select></div>
+        <button id="client-preview-open-btn" style="margin-top:12px">Abrir visão do cliente</button>
       </div>
     </section>
 

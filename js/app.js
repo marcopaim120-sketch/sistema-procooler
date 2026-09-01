@@ -80,7 +80,7 @@ async function refreshAll() {
 
 function fillProjectSelects() {
   const opts = cache.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  ['purchase-project', 'service-project', 'stage-project', 'payment-project', 'receivable-project', 'document-project'].forEach(id => {
+  ['purchase-project', 'service-project', 'stage-project', 'payment-project', 'receivable-project', 'document-project', 'client-preview-project'].forEach(id => {
     $(id).innerHTML = `<option value="">-</option>` + opts;
   });
   $('project-client').innerHTML = cache.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
@@ -228,6 +228,12 @@ window.previewClientView = (projectId) => {
   const previewUrl = `${location.origin}${location.pathname.replace('index.html', '')}client-portal.html?preview=${projectId}`;
   window.open(previewUrl, '_blank');
 };
+
+$('client-preview-open-btn').addEventListener('click', () => {
+  const projectId = $('client-preview-project').value;
+  if (!projectId) { toast('Selecione um projeto'); return; }
+  previewClientView(projectId);
+});
 
 $('new-project-btn').addEventListener('click', () => {
   $('project-id').value = ''; $('project-name').value = '';
