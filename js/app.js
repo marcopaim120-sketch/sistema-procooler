@@ -218,10 +218,16 @@ async function loadProjects() {
       <td>${statusBadge(p.status)}</td><td>${statusBadge(p.nf_status)}</td>
       <td class="list-actions">
         <button class="secondary" onclick="openProject('${p.id}')">Abrir</button>
+        <button class="secondary" onclick="previewClientView('${p.id}')">👁 Visão do cliente</button>
         <button class="danger" onclick="deleteRow('projects', '${p.id}', loadProjects)">Excluir</button>
       </td>
     </tr>`).join('');
 }
+
+window.previewClientView = (projectId) => {
+  const previewUrl = `${location.origin}${location.pathname.replace('index.html', '')}client-portal.html?preview=${projectId}`;
+  window.open(previewUrl, '_blank');
+};
 
 $('new-project-btn').addEventListener('click', () => {
   $('project-id').value = ''; $('project-name').value = '';
@@ -276,8 +282,7 @@ $('copy-share-link').addEventListener('click', () => {
 });
 
 $('preview-client-view-btn').addEventListener('click', () => {
-  const previewUrl = `${location.origin}${location.pathname.replace('index.html', '')}client-portal.html?preview=${currentProject.id}`;
-  window.open(previewUrl, '_blank');
+  previewClientView(currentProject.id);
 });
 
 $('save-access-password-btn').addEventListener('click', async () => {
