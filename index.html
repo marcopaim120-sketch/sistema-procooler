@@ -313,14 +313,19 @@
         <div class="row">
           <div class="field"><label>Status</label>
             <select id="stage-status">
-              <option value="pendente">Pendente</option>
-              <option value="andamento">Andamento</option>
-              <option value="concluido">Concluído</option>
+              <option value="iniciada">Iniciada</option>
+              <option value="andamento">Em andamento</option>
+              <option value="concluida">Concluída</option>
             </select>
           </div>
           <div class="field">
             <label><input type="checkbox" id="stage-billable" style="width:auto;vertical-align:middle"> Cobrado do cliente?</label>
           </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Data de início</label><input id="stage-start-date" type="date"></div>
+          <div class="field"><label>Prazo (previsão)</label><input id="stage-due-date" type="date"></div>
+          <div class="field"><label>Data de conclusão</label><input id="stage-end-date" type="date"></div>
         </div>
         <div class="row">
           <div class="field"><label>Valor (R$) — só se cobrado</label><input id="stage-cost" type="number" step="0.01"></div>
@@ -332,7 +337,7 @@
         <button class="secondary" id="cancel-stage-btn">Cancelar</button>
       </div>
       <div class="card">
-        <table><thead><tr><th>Ordem</th><th>Projeto</th><th>Etapa</th><th>Status</th><th>Cobrado?</th><th>Valor</th><th></th></tr></thead>
+        <table><thead><tr><th>Ordem</th><th>Projeto</th><th>Etapa</th><th>Início</th><th>Prazo</th><th>Conclusão</th><th>Status</th><th>Cobrado?</th><th>Valor</th><th></th></tr></thead>
         <tbody id="stages-table"></tbody></table>
       </div>
     </section>

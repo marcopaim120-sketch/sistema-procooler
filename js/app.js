@@ -16,7 +16,7 @@ function statusBadge(status) {
     rascunho: 'blue', enviada: 'amber', aprovada: 'green', recusada: 'red',
     a_cotar: '', cotado: 'green', preparacao: 'amber', andamento: 'blue', realizado: 'green',
     previsto: 'blue', pago: 'green', atrasado: 'red',
-    emitida: 'green', nao_aplicavel: 'blue', pendente: 'amber',
+    emitida: 'green', nao_aplicavel: 'blue', pendente: 'amber', iniciada: 'blue', concluida: 'green',
     aguardando_proposta: '', recebida: 'blue', em_analise: 'amber', escolhida: 'green'
   };
   return `<span class="badge ${map[status] || ''}">${status.replace('_', ' ')}</span>`;
@@ -750,6 +750,7 @@ async function loadStages() {
     <tr>
       <td class="num">${s.sequence}</td>
       <td>${s.projects?.name || ''}</td><td>${s.name}</td>
+      <td>${s.start_date || '-'}</td><td>${s.due_date || '-'}</td><td>${s.end_date || '-'}</td>
       <td>${statusBadge(s.status)}</td>
       <td>${s.billable_to_client ? 'Sim' : 'Não'}</td>
       <td class="num">${s.billable_to_client ? brl(s.cost) : '-'}</td>
@@ -762,7 +763,8 @@ async function loadStages() {
 
 $('new-stage-btn').addEventListener('click', () => {
   $('stage-id').value = ''; $('stage-name').value = ''; $('stage-sequence').value = '0';
-  $('stage-status').value = 'pendente'; $('stage-billable').checked = false;
+  $('stage-status').value = 'iniciada'; $('stage-billable').checked = false;
+  $('stage-start-date').value = ''; $('stage-due-date').value = ''; $('stage-end-date').value = '';
   $('stage-cost').value = ''; $('stage-payment-terms').value = ''; $('stage-notes').value = '';
   $('stage-form').classList.remove('hidden');
 });
@@ -776,6 +778,9 @@ window.editStage = (id) => {
   $('stage-sequence').value = s.sequence;
   $('stage-status').value = s.status;
   $('stage-billable').checked = s.billable_to_client;
+  $('stage-start-date').value = s.start_date || '';
+  $('stage-due-date').value = s.due_date || '';
+  $('stage-end-date').value = s.end_date || '';
   $('stage-cost').value = s.cost || '';
   $('stage-payment-terms').value = s.payment_terms || '';
   $('stage-notes').value = s.notes || '';
@@ -790,6 +795,9 @@ $('save-stage-btn').addEventListener('click', async () => {
     name: $('stage-name').value.trim(),
     sequence: Number($('stage-sequence').value) || 0,
     status: $('stage-status').value,
+    start_date: $('stage-start-date').value || null,
+    due_date: $('stage-due-date').value || null,
+    end_date: $('stage-end-date').value || null,
     billable_to_client: billable,
     cost: billable ? (Number($('stage-cost').value) || 0) : null,
     payment_terms: billable ? ($('stage-payment-terms').value.trim() || null) : null,

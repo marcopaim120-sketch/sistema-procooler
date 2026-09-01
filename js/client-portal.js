@@ -5,7 +5,9 @@ const statusLabel = {
   em_instalacao: 'Em instalação', concluido: 'Concluído', cancelado: 'Cancelado',
   pendente: 'Pendente', emitida: 'Emitida', nao_aplicavel: 'Não se aplica',
   a_cotar: 'A cotar', cotado: 'Cotado', preparacao: 'Em preparação', andamento: 'Em andamento', realizado: 'Realizado',
-  previsto: 'Previsto', pago: 'Pago', atrasado: 'Atrasado'
+  previsto: 'Previsto', pago: 'Pago', atrasado: 'Atrasado',
+  iniciada: 'Iniciada', concluida: 'Concluída',
+  aguardando_proposta: 'Aguardando proposta', recebida: 'Recebida', em_analise: 'Em análise', escolhida: 'Escolhida', recusada: 'Recusada'
 };
 
 let portalToken = null;
@@ -44,7 +46,7 @@ function showNotFound() {
 
 function render(data) {
   document.getElementById('content').classList.remove('hidden');
-  const { project, proposal, purchases, payments, receivables, stages, documents } = data;
+  const { project, proposal, purchases, payments, receivables, stages, purchase_quotes, documents } = data;
 
   document.getElementById('project-title').textContent = project.name;
   document.getElementById('project-subtitle').textContent = `Cliente: ${project.client_name}`;
@@ -79,8 +81,15 @@ function render(data) {
 
   // Etapas de produção
   document.getElementById('stages-list').innerHTML = (stages || []).map(s => `
-    <tr><td>${s.name}</td><td><span class="badge">${statusLabel[s.status] || s.status}</span></td><td>${s.billable_to_client ? brl(s.cost) : '-'}</td></tr>
+    <tr><td>${s.name}</td><td>${s.start_date || '-'}</td><td>${s.due_date || '-'}</td><td>${s.end_date || '-'}</td>
+      <td><span class="badge">${statusLabel[s.status] || s.status}</span></td><td>${s.billable_to_client ? brl(s.cost) : '-'}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma etapa registrada ainda.</td></tr>';
+
+  // Cotações de fornecedores comparadas
+  document.getElementById('quotes-list').innerHTML = (purchase_quotes || []).map(q => `
+    <tr><td>${q.purchase_description}</td><td>${q.supplier_name || '-'}</td><td>${brl(q.price)}</td><td>${brl(q.down_payment)}</td>
+      <td>${q.installments || '-'}</td><td>${q.delivery_date || '-'}</td><td><span class="badge">${statusLabel[q.status] || q.status}</span></td></tr>
+  `).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
 
   // Compras / economia
   const budgeted = (purchases || []).reduce((s, p) => s + (Number(p.budgeted_cost) || 0), 0);
@@ -120,11 +129,26 @@ function render(data) {
     <tr><td>${brl(r.amount)}</td><td>${r.due_date || '-'}</td><td>${r.paid_date || '-'}</td><td><span class="badge ${r.status === 'pago' ? 'green' : r.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[r.status] || r.status}</span></td></tr>
   `).join('') || '<tr><td class="muted">Nenhum recebimento programado ainda.</td></tr>';
 
-  // Documentos
-  document.getElementById('documents-list').innerHTML = (documents || []).map(d => {
-    const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
-    return `<tr><td><a href="${pub.publicUrl}" target="_blank">${d.file_name}</a></td><td class="muted">${d.category}</td></tr>`;
-  }).join('') || '<tr><td class="muted">Nenhum documento disponível ainda.</td></tr>';
+  // Documentos, agrupados por categoria (planta baixa/projeto técnico por último)
+  const categoryLabel = {
+    proposta: 'Propostas', contrato: 'Contratos', nf: 'Notas fiscais',
+    comprovante: 'Comprovantes e anexos de fornecedores/terceiros',
+    projeto_tecnico: 'Planta baixa / projeto técnico', outro: 'Outros'
+  };
+  const categoryOrder = ['proposta', 'contrato', 'comprovante', 'nf', 'outro', 'projeto_tecnico'];
+  const container = document.getElementById('documents-by-category');
+  const groups = {};
+  (documents || []).forEach(d => { (groups[d.category] = groups[d.category] || []).push(d); });
+  const usedCategories = categoryOrder.filter(c => groups[c] && groups[c].length);
+  container.innerHTML = usedCategories.length ? usedCategories.map(cat => `
+    <h4>${categoryLabel[cat] || cat}</h4>
+    <table><tbody>
+      ${groups[cat].map(d => {
+        const { data: pub } = sb.storage.from('documents').getPublicUrl(d.storage_path);
+        return `<tr><td><a href="${pub.publicUrl}" target="_blank">${d.file_name}</a></td></tr>`;
+      }).join('')}
+    </tbody></table>
+  `).join('') : '<p class="muted">Nenhum documento disponível ainda.</p>';
 }
 
 const monthNames = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];

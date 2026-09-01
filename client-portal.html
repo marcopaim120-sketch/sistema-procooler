@@ -76,14 +76,6 @@
     </div>
 
     <div class="card">
-      <h3>Etapas de produção</h3>
-      <table>
-        <thead><tr><th>Etapa</th><th>Status</th><th>Valor</th></tr></thead>
-        <tbody id="stages-list"></tbody>
-      </table>
-    </div>
-
-    <div class="card">
       <h3>Evolução das compras</h3>
       <div class="progress-bar"><div id="purchase-progress" style="width:0%"></div></div>
       <p class="muted" id="purchase-progress-label"></p>
@@ -93,6 +85,25 @@
         <tbody id="purchases-list"></tbody>
       </table>
       </div>
+    </div>
+
+    <div class="card">
+      <h3>Cotações de fornecedores comparadas</h3>
+      <p class="muted">Propostas de diferentes fornecedores para o mesmo item, para você acompanhar como chegamos na escolha.</p>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Item</th><th>Fornecedor</th><th>Preço</th><th>Entrada</th><th>Parcelas</th><th>Prazo entrega</th><th>Status</th></tr></thead>
+        <tbody id="quotes-list"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Etapas de produção</h3>
+      <table>
+        <thead><tr><th>Etapa</th><th>Início</th><th>Prazo</th><th>Conclusão</th><th>Status</th><th>Valor</th></tr></thead>
+        <tbody id="stages-list"></tbody>
+      </table>
     </div>
 
     <div class="card">
@@ -117,8 +128,9 @@
     </div>
 
     <div class="card">
-      <h3>Documentos</h3>
-      <table><tbody id="documents-list"></tbody></table>
+      <h3>Documentos e anexos</h3>
+      <p class="muted">Propostas, comprovantes e anexos enviados por fornecedores e serviços terceirizados, contratos, notas fiscais e, ao final, a planta baixa / imagens do projeto.</p>
+      <div id="documents-by-category"></div>
     </div>
 
   </div>

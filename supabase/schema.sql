@@ -125,8 +125,11 @@ create table project_stages (
   project_id uuid not null references projects(id) on delete cascade,
   name text not null,
   sequence int not null default 0,
-  status text not null default 'pendente'
-    check (status in ('pendente','andamento','concluido')),
+  start_date date,
+  due_date date,
+  end_date date,
+  status text not null default 'iniciada'
+    check (status in ('iniciada','andamento','concluida')),
   billable_to_client boolean not null default false,
   cost numeric(12,2),
   payment_terms text,
@@ -300,12 +303,27 @@ begin
     'stages', (
       select coalesce(json_agg(json_build_object(
         'name', st.name, 'status', st.status,
+        'start_date', st.start_date, 'due_date', st.due_date, 'end_date', st.end_date,
         'cost', case when st.billable_to_client then st.cost else null end,
         'payment_terms', case when st.billable_to_client then st.payment_terms else null end,
         'billable_to_client', st.billable_to_client
       ) order by st.sequence), '[]'::json)
       from project_stages st join projects p7 on p7.id = st.project_id
       where p7.share_token = p_token
+    ),
+    'purchase_quotes', (
+      select coalesce(json_agg(json_build_object(
+        'purchase_description', pu2.description,
+        'supplier_name', sup2.name,
+        'price', pq.price, 'down_payment', pq.down_payment,
+        'installments', pq.installments, 'delivery_date', pq.delivery_date,
+        'status', pq.status
+      ) order by pu2.priority, pq.price), '[]'::json)
+      from purchase_quotes pq
+      join purchases pu2 on pu2.id = pq.purchase_id
+      join projects p8 on p8.id = pu2.project_id
+      left join suppliers sup2 on sup2.id = pq.supplier_id
+      where p8.share_token = p_token
     ),
     'payments', (
       select coalesce(json_agg(json_build_object(
