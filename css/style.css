@@ -1,15 +1,19 @@
 :root {
+  /* Paleta oficial Pro Cooler: azul e vermelho da marca, aplicados de forma
+     discreta e alinhada ao significado contábil de cada cor (verde = ganho/
+     economia, âmbar = pendente, vermelho = atraso/alerta — como na marca). */
   --bg: #f2f6f9;
   --panel: #ffffff;
   --border: #dde5ec;
   --text: #101820;
   --muted: #5b6b7a;
-  --primary: #0e7dab;
-  --primary-dark: #0a5f82;
-  --dark: #0b1f2e;
-  --dark-alt: #12324a;
+  --primary: #0b5fa5;
+  --primary-dark: #084a80;
+  --dark: #1a1a1a;
+  --dark-alt: #2b2b2b;
   --success: #1a7f37;
-  --danger: #c92a2a;
+  --danger: #c0272d;
+  --danger-dark: #9e1f24;
   --warning: #b06a00;
   --radius: 10px;
 }
@@ -39,6 +43,7 @@ button:hover { background: var(--primary-dark); }
 button.secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
 button.secondary:hover { background: #f0f0f0; }
 button.danger { background: var(--danger); }
+button.danger:hover { background: var(--danger-dark); }
 
 input, select, textarea {
   font-family: inherit;
@@ -65,6 +70,7 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px
   flex-shrink: 0;
 }
 .sidebar h1 { font-size: 16px; margin: 0 0 24px; padding: 0 8px; }
+.sidebar .brand-mark { padding: 0 8px; margin-bottom: 10px; }
 .sidebar nav a {
   display: block;
   padding: 10px 12px;
@@ -118,7 +124,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .badge.green { background: #e3f5e8; color: var(--success); }
 .badge.red { background: #fbe4e4; color: var(--danger); }
 .badge.amber { background: #fdf0dc; color: var(--warning); }
-.badge.blue { background: #e3edf9; color: #1c5eab; }
+.badge.blue { background: #e3edf9; color: var(--primary); }
 
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 
@@ -197,6 +203,14 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .public-header h1 { margin: 0; font-size: 20px; }
 .public-header p { margin: 4px 0 0; color: #9fb7c8; font-size: 13px; }
+
+.brand-mark { display: flex; margin-bottom: 14px; }
+.brand-mark span {
+  font-size: 12px; font-weight: 800; letter-spacing: 1.5px;
+  padding: 4px 9px; color: #fff;
+}
+.brand-mark .lp { background: var(--danger); }
+.brand-mark .lc { background: var(--primary); }
 
 .progress-bar {
   height: 8px;
