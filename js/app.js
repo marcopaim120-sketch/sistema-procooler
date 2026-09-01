@@ -232,6 +232,7 @@ window.openProject = async (id) => {
   $('project-detail-title').textContent = currentProject.name;
   const shareUrl = `${location.origin}${location.pathname.replace('index.html', '')}client-portal.html?token=${currentProject.share_token}`;
   $('project-share-link').value = shareUrl;
+  $('project-access-password').value = '';
   $('project-detail').classList.remove('hidden');
   $('project-form').classList.add('hidden');
   await loadProposal(id);
@@ -245,6 +246,15 @@ $('close-project-detail').addEventListener('click', () => {
 $('copy-share-link').addEventListener('click', () => {
   navigator.clipboard.writeText($('project-share-link').value);
   toast('Link copiado');
+});
+
+$('save-access-password-btn').addEventListener('click', async () => {
+  const password = $('project-access-password').value.trim();
+  if (!password || password.length < 4) { toast('Informe uma senha com pelo menos 4 caracteres'); return; }
+  const { error } = await sb.rpc('set_project_access_password', { p_project_id: currentProject.id, p_password: password });
+  if (error) { toast(error.message); return; }
+  $('project-access-password').value = '';
+  toast('Senha do portal salva');
 });
 
 // ---------- Proposta ----------

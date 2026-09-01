@@ -31,6 +31,7 @@ create table projects (
   status text not null default 'orcamento'
     check (status in ('orcamento','aprovado','em_producao','em_instalacao','concluido','cancelado')),
   share_token uuid not null default gen_random_uuid() unique,
+  access_password_hash text,
   nf_status text not null default 'pendente'
     check (nf_status in ('pendente','emitida','nao_aplicavel')),
   nf_number text,
@@ -137,12 +138,30 @@ create policy "staff full access" on purchases for all using (auth.role() = 'aut
 create policy "staff full access" on payments for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "staff full access" on documents for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
--- ---------- Função pública para o portal do cliente ----------
--- Recebe o token único do projeto (share_token) e devolve um JSON somente
--- com os dados daquele projeto. SECURITY DEFINER contorna o RLS acima de
--- forma controlada, pois o filtro por token está embutido na função.
+-- ---------- Senha de acesso do portal do cliente ----------
+-- Só a equipe (autenticada) pode definir/trocar a senha de um projeto.
+-- A senha nunca é armazenada em texto puro, só o hash (bcrypt via pgcrypto).
 
-create or replace function get_project_public(p_token uuid)
+create or replace function set_project_access_password(p_project_id uuid, p_password text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update projects
+  set access_password_hash = crypt(p_password, gen_salt('bf'))
+  where id = p_project_id;
+$$;
+
+grant execute on function set_project_access_password(uuid, text) to authenticated;
+
+-- ---------- Função pública para o portal do cliente ----------
+-- Recebe o token único do projeto (share_token) e a senha definida pela
+-- equipe, e só devolve os dados se as duas coisas baterem. SECURITY
+-- DEFINER contorna o RLS acima de forma controlada, pois o filtro por
+-- token + senha está embutido na função.
+
+create or replace function get_project_public(p_token uuid, p_password text)
 returns json
 language plpgsql
 security definer
@@ -150,7 +169,18 @@ set search_path = public
 as $$
 declare
   result json;
+  v_hash text;
 begin
+  select access_password_hash into v_hash from projects where share_token = p_token;
+
+  if v_hash is null then
+    return json_build_object('error', 'invalid_token');
+  end if;
+
+  if p_password is null or crypt(p_password, v_hash) <> v_hash then
+    return json_build_object('error', 'invalid_password');
+  end if;
+
   select json_build_object(
     'project', (
       select json_build_object(
@@ -215,7 +245,7 @@ begin
 end;
 $$;
 
-grant execute on function get_project_public(uuid) to anon;
+grant execute on function get_project_public(uuid, text) to anon;
 
 -- ---------- Storage ----------
 -- Crie manualmente, no painel Supabase > Storage, um bucket chamado

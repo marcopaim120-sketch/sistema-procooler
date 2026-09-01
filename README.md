@@ -81,6 +81,12 @@ Depois de publicado, o link do portal do cliente será algo como:
 (o token é gerado automaticamente por projeto e aparece no painel interno,
 na tela de cada projeto, com um botão "Copiar").
 
+**O link sozinho não abre o portal** — o cliente também precisa de uma
+**senha**, definida por vocês na tela do projeto ("Senha de acesso do
+cliente" + botão "Salvar senha"). Combine essa senha com o cliente por um
+canal separado do link (ligação, WhatsApp), nunca no mesmo e-mail/mensagem
+onde vai o link.
+
 ## Como funciona o fluxo
 
 1. Cadastre o **cliente** e crie um **projeto** para ele.
@@ -117,10 +123,12 @@ na tela de cada projeto, com um botão "Copiar").
 - O painel interno (`index.html`) exige login (Supabase Auth) e qualquer
   usuário autenticado tem acesso total aos dados — não há hoje separação
   de permissões entre membros da equipe.
-- O portal do cliente é público, mas cada projeto só é acessível por quem
-  tiver o link com o token (um UUID longo, não adivinhável). Não há senha
-  no portal do cliente — trate o link como algo a compartilhar só com o
-  cliente certo.
+- O portal do cliente exige **duas coisas**: o link com o token (um UUID
+  longo, não adivinhável) **e** a senha definida por vocês para aquele
+  projeto. A senha fica salva como hash (bcrypt via `pgcrypto`), nunca em
+  texto puro no banco. Ainda assim, trate o link e a senha como
+  informação a compartilhar só com o cliente certo, de preferência por
+  canais separados.
 - Os documentos no bucket `documents` são publicamente legíveis por quem
   tiver a URL exata do arquivo (não listável, mas não é um segredo
   forte). Para dados muito sensíveis, isso pode ser evoluído depois para

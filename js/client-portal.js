@@ -8,17 +8,37 @@ const statusLabel = {
   previsto: 'Previsto', pago: 'Pago', atrasado: 'Atrasado'
 };
 
+let portalToken = null;
+
 (async () => {
-  const token = new URLSearchParams(location.search).get('token');
-  if (!token) return showNotFound();
-
-  const { data, error } = await sb.rpc('get_project_public', { p_token: token });
-  if (error || !data || !data.project) return showNotFound();
-
-  render(data);
+  portalToken = new URLSearchParams(location.search).get('token');
+  if (!portalToken) return showNotFound();
+  document.getElementById('password-gate').classList.remove('hidden');
+  document.getElementById('portal-password').focus();
 })();
 
+document.getElementById('portal-password-btn').addEventListener('click', submitPortalPassword);
+document.getElementById('portal-password').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitPortalPassword();
+});
+
+async function submitPortalPassword() {
+  const password = document.getElementById('portal-password').value;
+  const errorEl = document.getElementById('portal-password-error');
+  errorEl.textContent = '';
+  if (!password) { errorEl.textContent = 'Digite a senha.'; return; }
+
+  const { data, error } = await sb.rpc('get_project_public', { p_token: portalToken, p_password: password });
+  if (error) { errorEl.textContent = 'Erro ao verificar a senha. Tente novamente.'; return; }
+  if (!data || data.error === 'invalid_token') return showNotFound();
+  if (data.error === 'invalid_password') { errorEl.textContent = 'Senha incorreta.'; return; }
+
+  document.getElementById('password-gate').classList.add('hidden');
+  render(data);
+}
+
 function showNotFound() {
+  document.getElementById('password-gate').classList.add('hidden');
   document.getElementById('not-found').classList.remove('hidden');
 }
 

@@ -19,6 +19,10 @@
 --   2. Os custos unitários dos itens e os valores orçados das
 --      compras — não vieram no material de origem, então entram
 --      como 0 até você preencher os valores reais.
+--
+-- DEPOIS de rodar: o portal do cliente agora exige senha. Abra o projeto
+-- no painel interno e defina uma senha em "Senha de acesso do cliente" —
+-- sem isso, o link do portal não abre para ninguém.
 -- ============================================================
 
 with novo_cliente as (
