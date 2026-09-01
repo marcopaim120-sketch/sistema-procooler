@@ -102,6 +102,10 @@ h2 { margin-top: 0; }
   padding: 18px 20px;
   margin-bottom: 18px;
 }
+.card.accent-blue { border-top: 4px solid var(--primary); }
+.card.accent-green { border-top: 4px solid var(--success); }
+.card.accent-amber { border-top: 4px solid var(--warning); }
+.card.accent-red { border-top: 4px solid var(--danger); }
 
 .row { display: flex; gap: 12px; flex-wrap: wrap; }
 .row > * { flex: 1; min-width: 160px; }

@@ -18,6 +18,16 @@ const statusLabel = {
   aguardando_proposta: 'Aguardando proposta', recebida: 'Recebida', em_analise: 'Em análise', escolhida: 'Escolhida', recusada: 'Recusada'
 };
 
+function statusColor(status) {
+  const green = ['realizado', 'pago', 'concluida', 'concluido', 'escolhida', 'emitida'];
+  const red = ['cancelado', 'recusada', 'atrasado'];
+  const blue = ['andamento', 'em_producao', 'em_instalacao', 'aprovado', 'recebida', 'iniciada', 'cotado', 'em_analise'];
+  if (green.includes(status)) return 'green';
+  if (red.includes(status)) return 'red';
+  if (blue.includes(status)) return 'blue';
+  return 'amber';
+}
+
 let portalToken = null;
 
 (async () => {
@@ -97,7 +107,7 @@ function render(data) {
 
   document.getElementById('project-title').textContent = project.name;
   document.getElementById('project-subtitle').textContent = `Cliente: ${project.client_name}`;
-  document.getElementById('status-badge').innerHTML = `<span class="badge blue">${statusLabel[project.status] || project.status}</span>`;
+  document.getElementById('status-badge').innerHTML = `<span class="badge ${statusColor(project.status)}">${statusLabel[project.status] || project.status}</span>`;
   document.getElementById('nf-badge').innerHTML = `<span class="badge ${project.nf_status === 'emitida' ? 'green' : 'amber'}">${statusLabel[project.nf_status] || project.nf_status}${project.nf_number ? ' — ' + project.nf_number : ''}</span>`;
 
   // Proposta (só os totais aqui — o detalhamento item a item vai como anexo em Documentos)
@@ -141,25 +151,25 @@ function render(data) {
   document.getElementById('services-list').innerHTML = (outsourced_services || []).map(s => `
     <tr><td>${s.name}</td><td>${s.billable_to_client ? brl(s.budgeted_cost) : '-'}</td><td>${s.billable_to_client ? brl(s.actual_cost) : '-'}</td>
       <td>${s.data_prevista_conclusao || '-'}</td><td>${s.completion_date || '-'}</td>
-      <td><span class="badge">${statusLabel[s.status] || s.status}</span></td><td>${renderDocLinks(s.documents)}</td></tr>
+      <td><span class="badge ${statusColor(s.status)}">${statusLabel[s.status] || s.status}</span></td><td>${renderDocLinks(s.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhum serviço terceirizado registrado ainda.</td></tr>';
 
   document.getElementById('service-quotes-list').innerHTML = (service_quotes || []).map(q => `
     <tr><td>${q.service_name}</td><td>${q.supplier_name || '-'}</td><td>${brl(q.price)}</td><td>${brl(q.down_payment)}</td>
-      <td>${q.installments || '-'}</td><td>${q.completion_date || '-'}</td><td><span class="badge">${statusLabel[q.status] || q.status}</span></td>
+      <td>${q.installments || '-'}</td><td>${q.completion_date || '-'}</td><td><span class="badge ${statusColor(q.status)}">${statusLabel[q.status] || q.status}</span></td>
       <td>${renderDocLinks(q.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma cotação de serviço registrada ainda.</td></tr>';
 
   // Etapas de produção
   document.getElementById('stages-list').innerHTML = (stages || []).map(s => `
     <tr><td>${s.name}</td><td>${s.start_date || '-'}</td><td>${s.due_date || '-'}</td><td>${s.end_date || '-'}</td>
-      <td><span class="badge">${statusLabel[s.status] || s.status}</span></td><td>${s.billable_to_client ? brl(s.cost) : '-'}</td></tr>
+      <td><span class="badge ${statusColor(s.status)}">${statusLabel[s.status] || s.status}</span></td><td>${s.billable_to_client ? brl(s.cost) : '-'}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma etapa registrada ainda.</td></tr>';
 
   // Cotações de fornecedores comparadas
   document.getElementById('quotes-list').innerHTML = (purchase_quotes || []).map(q => `
     <tr><td>${q.purchase_description}</td><td>${q.supplier_name || '-'}</td><td>${brl(q.price)}</td><td>${brl(q.down_payment)}</td>
-      <td>${q.installments || '-'}</td><td>${q.delivery_date || '-'}</td><td><span class="badge">${statusLabel[q.status] || q.status}</span></td>
+      <td>${q.installments || '-'}</td><td>${q.delivery_date || '-'}</td><td><span class="badge ${statusColor(q.status)}">${statusLabel[q.status] || q.status}</span></td>
       <td>${renderDocLinks(q.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
 
@@ -187,19 +197,19 @@ function render(data) {
     <tr><td>${p.description}</td><td>${brl(p.budgeted_cost)}</td><td>${brl(p.actual_cost)}</td>
       <td>${p.data_prevista_cotacao || '-'}</td><td>${p.closing_date || '-'}</td>
       <td>${p.data_prevista_compra || '-'}</td><td>${p.forma_pagamento || '-'}</td>
-      <td><span class="badge">${statusLabel[p.status] || p.status}</span></td><td>${renderDocLinks(p.documents)}</td></tr>
+      <td><span class="badge ${statusColor(p.status)}">${statusLabel[p.status] || p.status}</span></td><td>${renderDocLinks(p.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma compra registrada ainda.</td></tr>';
 
   // Pagamentos (cliente -> fornecedor)
   document.getElementById('payments-list').innerHTML = (payments || []).map(p => `
-    <tr><td>${p.supplier_name || '-'}</td><td>${brl(p.amount)}</td><td>${p.method || '-'}</td><td>${p.due_date || '-'}</td><td>${p.paid_date || '-'}</td><td><span class="badge ${p.status === 'pago' ? 'green' : p.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[p.status] || p.status}</span></td>
+    <tr><td>${p.supplier_name || '-'}</td><td>${brl(p.amount)}</td><td>${p.method || '-'}</td><td>${p.due_date || '-'}</td><td>${p.paid_date || '-'}</td><td><span class="badge ${statusColor(p.status)}">${statusLabel[p.status] || p.status}</span></td>
       <td>${renderDocLinks(p.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhum pagamento programado ainda.</td></tr>';
   renderMonthlySummary('payments-monthly-list', payments || []);
 
   // Recebimentos (cliente -> Pro Cooler)
   document.getElementById('receivables-list').innerHTML = (receivables || []).map(r => `
-    <tr><td>${brl(r.amount)}</td><td>${r.due_date || '-'}</td><td>${r.paid_date || '-'}</td><td><span class="badge ${r.status === 'pago' ? 'green' : r.status === 'atrasado' ? 'red' : 'blue'}">${statusLabel[r.status] || r.status}</span></td>
+    <tr><td>${brl(r.amount)}</td><td>${r.due_date || '-'}</td><td>${r.paid_date || '-'}</td><td><span class="badge ${statusColor(r.status)}">${statusLabel[r.status] || r.status}</span></td>
       <td>${renderDocLinks(r.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhum recebimento programado ainda.</td></tr>';
 
