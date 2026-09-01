@@ -39,9 +39,31 @@ let portalToken = null;
 
 function showPreviewBanner() {
   const banner = document.createElement('div');
-  banner.textContent = '👁 Modo pré-visualização (equipe) — é exatamente isso que o cliente vê. Nada aqui é salvo.';
-  banner.style.cssText = 'background:#fff3bf;color:#664d03;text-align:center;padding:10px;font-weight:600';
+  banner.style.cssText = 'background:#fff3bf;color:#664d03;text-align:center;padding:10px;font-weight:600;display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap';
+
+  const text = document.createElement('span');
+  text.textContent = '👁 Modo pré-visualização (equipe) — é exatamente isso que o cliente vê. Nada aqui é salvo.';
+
+  const backBtn = document.createElement('button');
+  backBtn.textContent = '← Sair da pré-visualização';
+  backBtn.style.cssText = 'background:#664d03;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-weight:600;cursor:pointer';
+  backBtn.addEventListener('click', () => {
+    if (window.opener) { window.close(); }
+    else { location.href = location.pathname.replace('client-portal.html', 'index.html'); }
+  });
+
+  banner.append(text, backBtn);
   document.body.prepend(banner);
+
+  const footerBtn = backBtn.cloneNode(true);
+  footerBtn.addEventListener('click', () => {
+    if (window.opener) { window.close(); }
+    else { location.href = location.pathname.replace('client-portal.html', 'index.html'); }
+  });
+  const footerWrap = document.createElement('div');
+  footerWrap.style.cssText = 'text-align:center;padding:24px';
+  footerWrap.appendChild(footerBtn);
+  document.querySelector('.main').appendChild(footerWrap);
 }
 
 document.getElementById('portal-password-btn').addEventListener('click', submitPortalPassword);
