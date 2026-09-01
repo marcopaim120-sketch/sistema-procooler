@@ -272,7 +272,7 @@ create or replace function set_project_access_password(p_project_id uuid, p_pass
 returns void
 language sql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
   update projects
   set access_password_hash = crypt(p_password, gen_salt('bf'))
@@ -291,7 +291,7 @@ create or replace function get_project_public(p_token uuid, p_password text)
 returns json
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   result json;
