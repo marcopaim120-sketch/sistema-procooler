@@ -18,4 +18,5 @@ jobs:
         run: |
           curl -sS "https://fjvzdbgtfjirnaacshch.supabase.co/rest/v1/clients?select=id&limit=1" \
             -H "apikey: sb_publishable_iradWjmwUj7JzUfJauEf1A_zfSEMSZp" \
+            -H "Authorization: Bearer sb_publishable_iradWjmwUj7JzUfJauEf1A_zfSEMSZp" \
             -o /dev/null -w "Status: %{http_code}\n"
