@@ -26,6 +26,63 @@ function statusBadge(status) {
 let cache = { clients: [], suppliers: [], projects: [], proposalItems: [], receivables: [], stages: [], quotes: [], services: [], serviceQuotes: [] };
 
 // ---------- Autenticação ----------
+// Link de recuperação de senha enviado por e-mail (o supabase-js limpa o hash da URL logo em seguida).
+let passwordPending = /type=recovery/.test(location.hash);
+let passwordFromRecovery = passwordPending;
+let appBooted = false;
+
+function showPasswordScreen(fromRecovery) {
+  passwordFromRecovery = fromRecovery;
+  passwordPending = true;
+  $('password-title').textContent = fromRecovery ? 'Definir nova senha' : 'Alterar senha';
+  $('password-cancel-btn').classList.toggle('hidden', fromRecovery);
+  $('password-error').textContent = '';
+  $('new-password').value = '';
+  $('new-password2').value = '';
+  $('login-screen').classList.add('hidden');
+  $('app-shell').classList.add('hidden');
+  $('password-screen').classList.remove('hidden');
+  $('new-password').focus();
+}
+
+function hidePasswordScreen() {
+  passwordPending = false;
+  $('password-screen').classList.add('hidden');
+  if (appBooted) $('app-shell').classList.remove('hidden');
+}
+
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') showPasswordScreen(true);
+});
+
+$('forgot-link').addEventListener('click', async (e) => {
+  e.preventDefault();
+  const email = $('login-email').value.trim();
+  const msg = $('login-error');
+  if (!email) { msg.style.color = '#c92a2a'; msg.textContent = 'Digite seu e-mail acima e clique em "Esqueci minha senha" de novo.'; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' });
+  if (error) { msg.style.color = '#c92a2a'; msg.textContent = error.message; return; }
+  msg.style.color = '#2b8a3e';
+  msg.textContent = 'Se este e-mail estiver cadastrado, enviamos um link para definir a nova senha. Confira também o spam.';
+});
+
+$('change-password-btn').addEventListener('click', () => showPasswordScreen(false));
+$('password-cancel-btn').addEventListener('click', hidePasswordScreen);
+
+$('password-save-btn').addEventListener('click', async () => {
+  const p1 = $('new-password').value;
+  const p2 = $('new-password2').value;
+  const err = $('password-error');
+  if (p1.length < 8) { err.textContent = 'A senha precisa ter pelo menos 8 caracteres.'; return; }
+  if (p1 !== p2) { err.textContent = 'As duas senhas não são iguais.'; return; }
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if (error) { err.textContent = error.message; return; }
+  const wasRecovery = passwordFromRecovery;
+  hidePasswordScreen();
+  toast('Senha atualizada.');
+  if (wasRecovery) await boot();
+});
+
 $('login-btn').addEventListener('click', async () => {
   const email = $('login-email').value.trim();
   const password = $('login-password').value;
@@ -42,6 +99,8 @@ $('logout-btn').addEventListener('click', async () => {
 async function boot() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
+  if (passwordPending) { showPasswordScreen(passwordFromRecovery); return; }
+  appBooted = true;
   $('login-screen').classList.add('hidden');
   $('app-shell').classList.remove('hidden');
   $('user-email').textContent = session.user.email;

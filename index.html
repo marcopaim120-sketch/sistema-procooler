@@ -22,7 +22,27 @@
       <input id="login-password" type="password" placeholder="••••••••">
     </div>
     <button id="login-btn" style="width:100%">Entrar</button>
+    <p style="margin:12px 0 0;text-align:center"><a href="#" id="forgot-link" class="muted">Esqueci minha senha</a></p>
     <p class="muted" id="login-error" style="color:#c92a2a"></p>
+  </div>
+</div>
+
+<!-- DEFINIR / ALTERAR SENHA -->
+<div id="password-screen" class="login-screen hidden">
+  <div class="card">
+    <h2 id="password-title">Definir nova senha</h2>
+    <p class="muted" id="password-hint">Escolha uma senha com pelo menos 8 caracteres.</p>
+    <div class="field">
+      <label>Nova senha</label>
+      <input id="new-password" type="password" autocomplete="new-password" placeholder="••••••••">
+    </div>
+    <div class="field">
+      <label>Repita a nova senha</label>
+      <input id="new-password2" type="password" autocomplete="new-password" placeholder="••••••••">
+    </div>
+    <button id="password-save-btn" style="width:100%">Salvar senha</button>
+    <button id="password-cancel-btn" class="secondary hidden" style="margin-top:8px;width:100%">Cancelar</button>
+    <p class="muted" id="password-error" style="color:#c92a2a"></p>
   </div>
 </div>
 
@@ -46,7 +66,8 @@
     </nav>
     <div class="user-box">
       <div id="user-email"></div>
-      <button id="logout-btn" class="secondary" style="margin-top:10px;width:100%">Sair</button>
+      <button id="change-password-btn" class="secondary" style="margin-top:10px;width:100%">Alterar senha</button>
+      <button id="logout-btn" class="secondary" style="margin-top:8px;width:100%">Sair</button>
     </div>
   </div>
 
