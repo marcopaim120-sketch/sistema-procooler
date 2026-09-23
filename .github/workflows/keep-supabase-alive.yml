@@ -1,0 +1,21 @@
+name: Manter o Supabase ativo
+
+# O plano gratuito do Supabase pausa o projeto depois de alguns dias sem
+# nenhum acesso ao banco. Esse workflow faz uma consulta bem pequena e
+# gratuita de tempos em tempos só pra "acordar" o projeto e evitar a
+# pausa automática.
+
+on:
+  schedule:
+    - cron: "0 12 */3 * *" # a cada 3 dias, às 12:00 UTC
+  workflow_dispatch: {} # também dá pra rodar manualmente pela aba Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar o banco
+        run: |
+          curl -sS "https://fjvzdbgtfjirnaacshch.supabase.co/rest/v1/clients?select=id&limit=1" \
+            -H "apikey: sb_publishable_iradWjmwUj7JzUfJauEf1A_zfSEMSZp" \
+            -o /dev/null -w "Status: %{http_code}\n"
