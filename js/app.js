@@ -521,20 +521,62 @@ $('save-proposal-btn').addEventListener('click', async () => {
 });
 
 // ============================================================
-// COMPRAS
+// COTAÇÕES (antes "Compras") — V2 etapa 1
 // ============================================================
+const itemEstimate = (pi) => pi ? (Number(pi.quantity) || 0) * (Number(pi.estimated_unit_cost) || 0) : 0;
+const fmtDate = (d) => d ? d.split('-').reverse().join('/') : '-';
+
+// Rateio da cotação em edição (quando atende mais de um projeto)
+let allocRows = [];
+// Itens da proposta mais recente de cada projeto (cache de sessão)
+let proposalItemsCache = {};
+// false enquanto o banco ainda não recebeu o script v2_etapa1_cotacoes.sql
+let allocationsAvailable = true;
+
+async function getProposalItems(projectId) {
+  if (!projectId) return [];
+  if (proposalItemsCache[projectId]) return proposalItemsCache[projectId];
+  const { data: props } = await sb.from('proposals').select('id').eq('project_id', projectId).order('version', { ascending: false }).limit(1);
+  if (!props || !props.length) return (proposalItemsCache[projectId] = []);
+  const { data: items } = await sb.from('proposal_items').select('*').eq('proposal_id', props[0].id);
+  return (proposalItemsCache[projectId] = items || []);
+}
+
+const PURCHASE_SELECT_V2 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost), purchase_allocations(id, project_id, proposal_item_id, amount, pct, projects(name), proposal_items(description, quantity, estimated_unit_cost))';
+const PURCHASE_SELECT_V1 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost)';
+
 async function loadPurchases() {
-  const { data, error } = await sb.from('purchases').select('*, projects(name), suppliers(name)').order('priority');
-  if (error) { toast(error.message); return; }
+  let res = await sb.from('purchases').select(PURCHASE_SELECT_V2).order('priority');
+  if (res.error) {
+    // Banco ainda sem o script v2_etapa1_cotacoes.sql: continua funcionando no modo antigo.
+    allocationsAvailable = false;
+    res = await sb.from('purchases').select(PURCHASE_SELECT_V1).order('priority');
+  } else {
+    allocationsAvailable = true;
+  }
+  if (res.error) { toast(res.error.message); return; }
+  const data = res.data;
   cache.purchases = data;
+  $('purchase-v2-notice').classList.toggle('hidden', allocationsAvailable);
   $('purchases-table').innerHTML = data.map(p => {
-    const savings = (Number(p.budgeted_cost) || 0) - (Number(p.actual_cost) || 0);
+    const allocs = p.purchase_allocations || [];
+    const multi = allocs.length > 1;
+    const estimado = multi ? allocs.reduce((s, a) => s + itemEstimate(a.proposal_items), 0) : itemEstimate(p.proposal_items);
+    const fechado = multi ? allocs.reduce((s, a) => s + (Number(a.amount) || 0), 0) : (Number(p.actual_cost) || 0);
+    const base = estimado || (Number(p.budgeted_cost) || 0);
+    const economia = base - fechado;
+    const projetos = multi ? allocs.map(a => a.projects?.name).filter(Boolean).join(' + ') : (p.projects?.name || '');
     return `<tr>
       <td class="num">${p.priority ?? 0}</td>
-      <td>${p.projects?.name || ''}</td><td>${p.description}</td><td>${p.suppliers?.name || ''}</td>
-      <td class="num">${brl(p.budgeted_cost)}</td><td class="num">${brl(p.actual_cost)}</td>
-      <td class="num" style="color:${savings >= 0 ? 'var(--success)' : 'var(--danger)'}">${brl(savings)}</td>
-      <td>${p.data_prevista_compra || '-'}</td>
+      <td>${projetos}</td><td>${p.description}</td><td>${p.suppliers?.name || ''}</td>
+      <td class="num">${estimado ? brl(estimado) : '-'}</td>
+      <td class="num">${brl(p.budgeted_cost)}</td>
+      <td class="num">${fechado ? brl(fechado) : '-'}</td>
+      <td class="num" style="color:${economia >= 0 ? 'var(--success)' : 'var(--danger)'}">${fechado ? brl(economia) : '-'}</td>
+      <td>${fmtDate(p.data_prevista_compra)}</td>
+      <td>${fmtDate(p.expected_delivery_date)}</td>
+      <td>${fmtDate(p.purchase_date)}</td>
+      <td>${fmtDate(p.delivery_date)}</td>
       <td>${statusBadge(p.status)}</td>
       <td class="list-actions">
         <button class="secondary" onclick="openQuotes('${p.id}')">Cotações</button>
@@ -547,13 +589,89 @@ async function loadPurchases() {
   await loadDashboard();
 }
 
+// ---------- Rateio entre projetos ----------
+const docTotalValue = () => Number($('purchase-doc-total').value) || Number($('purchase-actual').value) || 0;
+
+function updateAllocSum() {
+  const total = docTotalValue();
+  const sum = allocRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const diff = Number((total - sum).toFixed(2));
+  const el = $('purchase-alloc-sum');
+  el.textContent = `Soma dos projetos: ${brl(sum)} de ${brl(total)}` + (diff ? ` — diferença ${brl(diff)}` : ' ✓');
+  el.style.color = diff ? 'var(--danger)' : 'var(--success)';
+}
+
+async function renderAllocBlock() {
+  const block = $('purchase-alloc-block');
+  const splitBtn = $('split-purchase-btn');
+  if (allocRows.length < 2) { block.classList.add('hidden'); splitBtn.classList.toggle('hidden', !allocationsAvailable); return; }
+  block.classList.remove('hidden');
+  splitBtn.classList.add('hidden');
+  const projOpts = (sel) => '<option value="">Escolha...</option>' + (cache.projects || []).map(pr => `<option value="${pr.id}" ${pr.id === sel ? 'selected' : ''}>${pr.name}</option>`).join('');
+  const rows = [];
+  for (let i = 0; i < allocRows.length; i++) {
+    const r = allocRows[i];
+    const items = await getProposalItems(r.project_id);
+    const itemOpts = '<option value="">-</option>' + items.map(it => `<option value="${it.id}" ${it.id === r.proposal_item_id ? 'selected' : ''}>${it.description}</option>`).join('');
+    rows.push(`<tr>
+      <td><select onchange="allocChange(${i}, 'project_id', this.value)">${projOpts(r.project_id)}</select></td>
+      <td><select onchange="allocChange(${i}, 'proposal_item_id', this.value)">${itemOpts}</select></td>
+      <td><input type="number" step="0.01" value="${r.amount ?? ''}" onchange="allocChange(${i}, 'amount', this.value)" style="width:110px"></td>
+      <td><input type="number" step="0.01" value="${r.pct ?? ''}" onchange="allocChange(${i}, 'pct', this.value)" style="width:70px"></td>
+      <td>${i > 0 ? `<button class="danger" onclick="removeAlloc(${i})">x</button>` : ''}</td>
+    </tr>`);
+  }
+  $('purchase-alloc-rows').innerHTML = rows.join('');
+  updateAllocSum();
+}
+
+window.allocChange = (i, field, val) => {
+  const r = allocRows[i];
+  const total = docTotalValue();
+  if (field === 'amount') {
+    r.amount = val === '' ? null : Number(val);
+    if (total && r.amount != null) r.pct = Number((r.amount / total * 100).toFixed(3));
+  } else if (field === 'pct') {
+    r.pct = val === '' ? null : Number(val);
+    if (total && r.pct != null) r.amount = Number((total * r.pct / 100).toFixed(2));
+  } else {
+    r[field] = val || null;
+    if (field === 'project_id') r.proposal_item_id = null;
+  }
+  renderAllocBlock();
+};
+
+window.removeAlloc = (i) => {
+  allocRows.splice(i, 1);
+  renderAllocBlock();
+};
+
+$('split-purchase-btn').addEventListener('click', async () => {
+  const total = docTotalValue();
+  allocRows = [
+    { project_id: $('purchase-project').value || null, proposal_item_id: $('purchase-proposal-item').value || null, amount: total || null, pct: total ? 100 : null },
+    { project_id: null, proposal_item_id: null, amount: null, pct: null }
+  ];
+  await renderAllocBlock();
+});
+$('add-alloc-btn').addEventListener('click', async () => {
+  if (allocRows.length >= 3) { toast('Use no máximo 3 projetos por cotação'); return; }
+  allocRows.push({ project_id: null, proposal_item_id: null, amount: null, pct: null });
+  await renderAllocBlock();
+});
+$('purchase-doc-total').addEventListener('input', () => { if (allocRows.length > 1) updateAllocSum(); });
+
 $('new-purchase-btn').addEventListener('click', () => {
   $('purchase-id').value = ''; $('purchase-description').value = ''; $('purchase-priority').value = '0';
-  $('purchase-budgeted').value = ''; $('purchase-actual').value = '';
+  $('purchase-budgeted').value = ''; $('purchase-actual').value = ''; $('purchase-doc-total').value = '';
   $('purchase-date').value = ''; $('purchase-status').value = 'a_cotar';
   $('purchase-cotacao-date').value = ''; $('purchase-closing-date').value = ''; $('purchase-planned-date').value = '';
+  $('purchase-expected-delivery').value = ''; $('purchase-delivery-date').value = '';
   $('purchase-payment-terms').value = ''; $('purchase-notes').value = '';
   $('purchase-proposal-item').innerHTML = '<option value="">-</option>';
+  proposalItemsCache = {};
+  allocRows = [];
+  renderAllocBlock();
   $('purchase-form').classList.remove('hidden');
   $('quotes-panel').classList.add('hidden');
 });
@@ -562,9 +680,7 @@ $('cancel-purchase-btn').addEventListener('click', () => $('purchase-form').clas
 $('purchase-project').addEventListener('change', async (e) => {
   const projectId = e.target.value;
   if (!projectId) { $('purchase-proposal-item').innerHTML = '<option value="">-</option>'; return; }
-  const { data: props } = await sb.from('proposals').select('id').eq('project_id', projectId).order('version', { ascending: false }).limit(1);
-  if (!props.length) { $('purchase-proposal-item').innerHTML = '<option value="">-</option>'; return; }
-  const { data: items } = await sb.from('proposal_items').select('*').eq('proposal_id', props[0].id);
+  const items = await getProposalItems(projectId);
   $('purchase-proposal-item').innerHTML = '<option value="">-</option>' + items.map(i => `<option value="${i.id}" data-cost="${i.quantity * i.estimated_unit_cost}">${i.description}</option>`).join('');
 });
 
@@ -573,8 +689,9 @@ $('purchase-proposal-item').addEventListener('change', (e) => {
   if (opt && opt.dataset.cost) $('purchase-budgeted').value = Number(opt.dataset.cost).toFixed(2);
 });
 
-window.editPurchase = (id) => {
+window.editPurchase = async (id) => {
   const p = cache.purchases.find(x => x.id === id);
+  proposalItemsCache = {};
   $('purchase-id').value = p.id;
   $('purchase-project').value = p.project_id;
   $('purchase-project').dispatchEvent(new Event('change'));
@@ -583,13 +700,19 @@ window.editPurchase = (id) => {
   $('purchase-priority').value = p.priority ?? 0;
   $('purchase-budgeted').value = p.budgeted_cost;
   $('purchase-actual').value = p.actual_cost;
+  $('purchase-doc-total').value = p.document_total ?? '';
   $('purchase-date').value = p.purchase_date || '';
   $('purchase-cotacao-date').value = p.data_prevista_cotacao || '';
   $('purchase-closing-date').value = p.closing_date || '';
   $('purchase-planned-date').value = p.data_prevista_compra || '';
+  $('purchase-expected-delivery').value = p.expected_delivery_date || '';
+  $('purchase-delivery-date').value = p.delivery_date || '';
   $('purchase-payment-terms').value = p.forma_pagamento || '';
   $('purchase-notes').value = p.notes || '';
   $('purchase-status').value = p.status;
+  const allocs = (p.purchase_allocations || []).slice().sort((a, b) => (b.project_id === p.project_id) - (a.project_id === p.project_id));
+  allocRows = allocs.length > 1 ? allocs.map(a => ({ project_id: a.project_id, proposal_item_id: a.proposal_item_id, amount: a.amount, pct: a.pct })) : [];
+  await renderAllocBlock();
   $('purchase-form').classList.remove('hidden');
   setTimeout(() => { $('purchase-proposal-item').value = p.proposal_item_id || ''; }, 300);
 };
@@ -612,13 +735,42 @@ $('save-purchase-btn').addEventListener('click', async () => {
     notes: $('purchase-notes').value.trim() || null,
     status: $('purchase-status').value
   };
+  if (allocationsAvailable) {
+    payload.document_total = Number($('purchase-doc-total').value) || null;
+    payload.expected_delivery_date = $('purchase-expected-delivery').value || null;
+    payload.delivery_date = $('purchase-delivery-date').value || null;
+  }
+  const rows = allocationsAvailable && allocRows.length > 1 ? allocRows : null;
+  if (rows) {
+    if (rows.some(r => !r.project_id)) { toast('Escolha o projeto em todas as linhas do rateio'); return; }
+    if (new Set(rows.map(r => r.project_id)).size !== rows.length) { toast('Cada projeto só pode aparecer uma vez no rateio'); return; }
+    // O primeiro projeto do rateio é o principal da cotação; o "fechado" dele é a parte dele.
+    payload.project_id = rows[0].project_id;
+    payload.proposal_item_id = rows[0].proposal_item_id || null;
+    payload.actual_cost = Number(rows[0].amount) || 0;
+  }
   if (!payload.project_id || !payload.description) { toast('Informe projeto e descrição'); return; }
-  const q = id ? sb.from('purchases').update(payload).eq('id', id) : sb.from('purchases').insert(payload);
-  const { error } = await q;
+  const q = id ? sb.from('purchases').update(payload).eq('id', id).select('id').single()
+               : sb.from('purchases').insert(payload).select('id').single();
+  const { data: saved, error } = await q;
   if (error) { toast(error.message); return; }
+  let warn = '';
+  if (allocationsAvailable) {
+    const list = rows || [{ project_id: payload.project_id, proposal_item_id: payload.proposal_item_id, amount: payload.actual_cost, pct: 100 }];
+    await sb.from('purchase_allocations').delete().eq('purchase_id', saved.id);
+    const { error: e2 } = await sb.from('purchase_allocations').insert(list.map(r => ({
+      purchase_id: saved.id, project_id: r.project_id, proposal_item_id: r.proposal_item_id || null,
+      amount: Number(r.amount) || 0, pct: r.pct ?? null
+    })));
+    if (e2) warn = ' (o rateio não foi salvo: ' + e2.message + ')';
+    else if (rows) {
+      const sum = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      if (Math.abs(sum - docTotalValue()) > 0.009) warn = ' — atenção: a soma do rateio não fecha com o total do documento';
+    }
+  }
   $('purchase-form').classList.add('hidden');
   await loadPurchases();
-  toast('Compra salva');
+  toast('Cotação salva' + warn);
 });
 
 // ---------- Cotações de fornecedores por compra ----------
@@ -696,6 +848,12 @@ window.chooseQuote = async (id) => {
     closing_date: new Date().toISOString().slice(0, 10),
     status: 'cotado'
   }).eq('id', currentQuotesPurchaseId);
+  if (allocationsAvailable) {
+    const pur = cache.purchases.find(p => p.id === currentQuotesPurchaseId);
+    if (pur && (pur.purchase_allocations || []).length <= 1) {
+      await sb.from('purchase_allocations').update({ amount: quote.price || 0 }).eq('purchase_id', currentQuotesPurchaseId);
+    }
+  }
   await loadQuotes();
   await loadPurchases();
   toast('Cotação escolhida — dados da compra atualizados');

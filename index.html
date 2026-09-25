@@ -246,7 +246,8 @@
 
     <!-- COMPRAS -->
     <section id="view-purchases" class="view">
-      <div class="toolbar"><h2>Compras</h2><button id="new-purchase-btn">+ Nova compra</button></div>
+      <div class="toolbar"><h2>Cotações</h2><button id="new-purchase-btn">+ Nova cotação</button></div>
+      <p id="purchase-v2-notice" class="muted hidden" style="color:#b7791f">Atenção: o banco ainda não recebeu o script <b>v2_etapa1_cotacoes.sql</b>. Enquanto isso, rateio entre projetos, valor total do documento e as novas datas ficam desligados.</p>
       <div id="purchase-form" class="card hidden">
         <div class="row">
           <div class="field"><label>Projeto</label><select id="purchase-project"></select></div>
@@ -258,16 +259,30 @@
           <div class="field"><label>Prioridade (ordem)</label><input id="purchase-priority" type="number" step="1" placeholder="0 = primeiro"></div>
         </div>
         <div class="row">
-          <div class="field"><label>Custo orçado (R$)</label><input id="purchase-budgeted" type="number" step="0.01"></div>
-          <div class="field"><label>Custo real (R$)</label><input id="purchase-actual" type="number" step="0.01"></div>
+          <div class="field"><label>Orçado (R$) — preço cotado</label><input id="purchase-budgeted" type="number" step="0.01"></div>
+          <div class="field"><label>Fechado (R$)</label><input id="purchase-actual" type="number" step="0.01"></div>
         </div>
         <div class="row">
           <div class="field"><label>Data da proposta/cotação</label><input id="purchase-cotacao-date" type="date"></div>
           <div class="field"><label>Data do fechamento (decisão)</label><input id="purchase-closing-date" type="date"></div>
-          <div class="field"><label>Prazo de entrega</label><input id="purchase-planned-date" type="date"></div>
+          <div class="field"><label>Previsão de compra</label><input id="purchase-planned-date" type="date"></div>
         </div>
         <div class="row">
-          <div class="field"><label>Data real da compra</label><input id="purchase-date" type="date"></div>
+          <div class="field"><label>Valor total do documento (R$)</label><input id="purchase-doc-total" type="number" step="0.01" placeholder="Total do pedido/PDF anexado"></div>
+          <div class="field"><label>Previsão de entrega</label><input id="purchase-expected-delivery" type="date"></div>
+          <div class="field"><label>Data da entrega</label><input id="purchase-delivery-date" type="date"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Data da compra</label><input id="purchase-date" type="date"></div>
+        </div>
+        <button type="button" class="secondary" id="split-purchase-btn">+ Dividir esta compra entre mais de um projeto</button>
+        <div id="purchase-alloc-block" class="hidden" style="margin-top:8px">
+          <label>Rateio entre projetos (a compra e o pagamento são um só; aqui você divide o valor por projeto)</label>
+          <table class="items-table">
+            <thead><tr><th>Projeto</th><th>Material da proposta</th><th>Valor (R$)</th><th>%</th><th></th></tr></thead>
+            <tbody id="purchase-alloc-rows"></tbody>
+          </table>
+          <div style="margin-top:6px"><button type="button" class="secondary" id="add-alloc-btn">+ Projeto</button> <span id="purchase-alloc-sum" class="muted"></span></div>
         </div>
         <div class="row">
           <div class="field"><label>Forma de pagamento</label><input id="purchase-payment-terms" placeholder="Ex: 1+3, 1+28, 1+30/60"></div>
@@ -288,7 +303,7 @@
         <button class="secondary" id="cancel-purchase-btn">Cancelar</button>
       </div>
       <div class="card">
-        <table><thead><tr><th>Prior.</th><th>Projeto</th><th>Categoria/Item</th><th>Fornecedor</th><th>Orçado</th><th>Real</th><th>Economia</th><th>Previsão compra</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Prior.</th><th>Projeto(s)</th><th>Materiais orçados</th><th>Fornecedor</th><th>Estimado</th><th>Orçado</th><th>Fechado</th><th>Economia</th><th>Prev. compra</th><th>Prev. entrega</th><th>Data compra</th><th>Data entrega</th><th>Status</th><th></th></tr></thead>
         <tbody id="purchases-table"></tbody></table>
       </div>
 
