@@ -575,10 +575,8 @@ async function loadPurchases() {
       <td class="num">${brl(p.budgeted_cost)}</td>
       <td class="num">${fechado ? brl(fechado) : '-'}</td>
       <td class="num" style="color:${economia >= 0 ? 'var(--success)' : 'var(--danger)'}">${fechado ? brl(economia) : '-'}</td>
-      <td>${fmtDate(p.data_prevista_compra)}</td>
-      <td>${fmtDate(p.expected_delivery_date)}</td>
-      <td>${fmtDate(p.purchase_date)}</td>
-      <td>${fmtDate(p.delivery_date)}</td>
+      <td>${fmtDate(p.data_prevista_compra)}<br><b>${fmtDate(p.purchase_date)}</b></td>
+      <td>${fmtDate(p.expected_delivery_date)}<br><b>${fmtDate(p.delivery_date)}</b></td>
       <td>${statusBadge(p.status)}</td>
       <td class="list-actions">
         <button class="secondary" onclick="openQuotes('${p.id}')">Cotações</button>
