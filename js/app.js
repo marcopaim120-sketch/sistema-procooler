@@ -527,6 +527,8 @@ const itemEstimate = (pi) => pi ? (Number(pi.quantity) || 0) * (Number(pi.estima
 const fmtDate = (d) => d ? d.split('-').reverse().join('/') : '-';
 
 // Rateio da cotação em edição (quando atende mais de um projeto)
+// Limite de projetos por cotação (só na tela; o banco não limita).
+const MAX_ALLOC_PROJECTS = 5;
 let allocRows = [];
 // Itens da proposta mais recente de cada projeto (cache de sessão)
 let proposalItemsCache = {};
@@ -655,7 +657,7 @@ $('split-purchase-btn').addEventListener('click', async () => {
   await renderAllocBlock();
 });
 $('add-alloc-btn').addEventListener('click', async () => {
-  if (allocRows.length >= 3) { toast('Use no máximo 3 projetos por cotação'); return; }
+  if (allocRows.length >= MAX_ALLOC_PROJECTS) { toast(`Use no máximo ${MAX_ALLOC_PROJECTS} projetos por cotação`); return; }
   allocRows.push({ project_id: null, proposal_item_id: null, amount: null, pct: null });
   await renderAllocBlock();
 });
