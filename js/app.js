@@ -710,9 +710,10 @@ $('purchase-project').addEventListener('change', async (e) => {
   $('purchase-proposal-item').innerHTML = '<option value="">-</option>' + items.map(i => `<option value="${i.id}" data-cost="${i.quantity * i.estimated_unit_cost}">${i.description}</option>`).join('');
 });
 
+// Escolher o item da proposta só mostra o Estimado; NÃO mexe no Orçado (preço cotado).
 $('purchase-proposal-item').addEventListener('change', (e) => {
   const opt = e.target.selectedOptions[0];
-  if (opt && opt.dataset.cost) $('purchase-budgeted').value = Number(opt.dataset.cost).toFixed(2);
+  $('purchase-estimate-hint').textContent = opt && opt.dataset.cost ? 'Estimado na proposta: ' + brl(Number(opt.dataset.cost)) : '';
 });
 
 window.editPurchase = async (id) => {
