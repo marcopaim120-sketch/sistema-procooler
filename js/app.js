@@ -565,6 +565,49 @@ let installmentsAvailable = false;
 let suppliersV2 = false;
 const PURCHASE_SELECT_V1 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost)';
 
+// ---------- Saldo encadeado do Estimado ----------
+// O Estimado de cada item da proposta (de cada projeto) vai sendo consumido pelas
+// compras "realizado", em ordem de data da compra (empate: ordem de criação).
+// O Estimado mostrado numa cotação é o SALDO do item antes dela; a Economia é
+// esse saldo menos o fechado (fica negativa/vermelha se a compra passar do saldo).
+function computePurchaseCalc(list) {
+  const calc = {};
+  const consumed = {}; // proposal_item_id -> total já comprado (compras realizadas)
+  const key = (p) => (p.purchase_date || '9999-12-31') + '|' + (p.created_at || '');
+  const ordered = list.slice().sort((x, y) => (key(x) < key(y) ? -1 : key(x) > key(y) ? 1 : 0));
+  for (const p of ordered) {
+    const allocs = p.purchase_allocations || [];
+    const lines = allocs.length
+      ? allocs.map(l => ({ itemId: l.proposal_item_id, item: l.proposal_items, amount: Number(l.amount) || 0, project: l.projects?.name || '' }))
+      : [{ itemId: p.proposal_item_id, item: p.proposal_items, amount: Number(p.actual_cost) || 0, project: p.projects?.name || '' }];
+    let estimado = 0, fechado = 0, fechadoLinked = 0;
+    const names = [], notes = [];
+    for (const l of lines) {
+      fechado += l.amount;
+      if (l.itemId && l.item) {
+        const est = itemEstimate(l.item);
+        const before = consumed[l.itemId] || 0;
+        estimado += est - before;
+        fechadoLinked += l.amount;
+        if (l.item.description) names.push(l.item.description);
+        if (before > 0) notes.push(`${l.project ? l.project + ': ' : ''}${brl(est)} − ${brl(before)} já comprado`);
+        if (p.status === 'realizado') consumed[l.itemId] = before + l.amount;
+      }
+    }
+    const linked = names.length > 0 || estimado !== 0;
+    calc[p.id] = {
+      estimado, fechado,
+      economia: linked ? estimado - fechadoLinked : (Number(p.budgeted_cost) || 0) - fechado,
+      projetos: allocs.length > 1 ? allocs.map(l => l.projects?.name).filter(Boolean).join(' + ') : (p.projects?.name || ''),
+      materiais: names.length
+        ? `<b>${names.join(' + ')}</b><div class="muted" style="font-size:10px;line-height:1.2">${p.description}</div>`
+        : p.description,
+      notes: notes.length ? `<div class="muted" style="font-size:10px;line-height:1.2">${notes.join('<br>')}</div>` : ''
+    };
+  }
+  return calc;
+}
+
 async function loadPurchases() {
   let res = await sb.from('purchases').select(PURCHASE_SELECT_V3).order('priority');
   if (!res.error) {
@@ -584,19 +627,14 @@ async function loadPurchases() {
   if (res.error) { toast(res.error.message); return; }
   const data = res.data;
   cache.purchases = data;
+  cache.calc = computePurchaseCalc(data);
   $('purchase-v2-notice').classList.toggle('hidden', allocationsAvailable);
   $('purchases-table').innerHTML = data.map(p => {
-    const allocs = p.purchase_allocations || [];
-    const multi = allocs.length > 1;
-    const estimado = multi ? allocs.reduce((s, a) => s + itemEstimate(a.proposal_items), 0) : itemEstimate(p.proposal_items);
-    const fechado = multi ? allocs.reduce((s, a) => s + (Number(a.amount) || 0), 0) : (Number(p.actual_cost) || 0);
-    const base = estimado || (Number(p.budgeted_cost) || 0);
-    const economia = base - fechado;
-    const projetos = multi ? allocs.map(a => a.projects?.name).filter(Boolean).join(' + ') : (p.projects?.name || '');
+    const { estimado, fechado, economia, projetos, materiais, notes } = cache.calc[p.id];
     return `<tr>
       <td class="num">${p.priority ?? 0}</td>
-      <td>${projetos}</td><td>${p.description}</td><td>${p.suppliers?.name || ''}</td>
-      <td class="num">${estimado ? brl(estimado) : '-'}</td>
+      <td>${projetos}</td><td>${materiais}</td><td>${p.suppliers?.name || ''}</td>
+      <td class="num">${estimado ? brl(estimado) : '-'}${notes}</td>
       <td class="num">${brl(p.budgeted_cost)}</td>
       <td class="num">${fechado ? brl(fechado) : '-'}</td>
       <td class="num" style="color:${economia >= 0 ? 'var(--success)' : 'var(--danger)'}">${fechado ? brl(economia) : '-'}</td>
@@ -1030,17 +1068,11 @@ function renderCompras() {
   $('compras-v2-notice').classList.toggle('hidden', installmentsAvailable);
   const list = (cache.purchases || []).filter(p => p.status === 'realizado');
   $('compras-table').innerHTML = list.map(p => {
-    const allocs = p.purchase_allocations || [];
-    const multi = allocs.length > 1;
-    const estimado = multi ? allocs.reduce((s, a) => s + itemEstimate(a.proposal_items), 0) : itemEstimate(p.proposal_items);
-    const fechado = multi ? allocs.reduce((s, a) => s + (Number(a.amount) || 0), 0) : (Number(p.actual_cost) || 0);
-    const base = estimado || (Number(p.budgeted_cost) || 0);
-    const economia = base - fechado;
-    const projetos = multi ? allocs.map(a => a.projects?.name).filter(Boolean).join(' + ') : (p.projects?.name || '');
+    const { estimado, fechado, economia, projetos, materiais, notes } = cache.calc[p.id];
     return `<tr>
       <td class="num">${p.priority ?? 0}</td>
-      <td>${projetos}</td><td>${p.description}</td><td>${p.suppliers?.name || '<span class="muted">-</span>'}</td>
-      <td class="num">${estimado ? brl(estimado) : '-'}</td>
+      <td>${projetos}</td><td>${materiais}</td><td>${p.suppliers?.name || '<span class="muted">-</span>'}</td>
+      <td class="num">${estimado ? brl(estimado) : '-'}${notes}</td>
       <td class="num">${fechado ? brl(fechado) : '-'}</td>
       <td class="num" style="color:${economia >= 0 ? 'var(--success)' : 'var(--danger)'}">${fechado ? brl(economia) : '-'}</td>
       <td>${fmtDate(p.purchase_date)}</td>
