@@ -225,9 +225,12 @@ async function loadSuppliers() {
   const { data, error } = await sb.from('suppliers').select('*').order('name');
   if (error) { toast(error.message); return; }
   cache.suppliers = data;
+  suppliersV2 = !(await sb.from('suppliers').select('cnpj').limit(1)).error;
   $('suppliers-table').innerHTML = data.map(s => `
     <tr>
-      <td>${s.name}</td><td>${s.contact || ''}</td>
+      <td>${s.name}</td>
+      <td>${[s.legal_name, s.cnpj].filter(Boolean).join(' · ')}</td>
+      <td>${[s.contact, s.email, s.phone].filter(Boolean).join(' · ')}</td>
       <td class="list-actions">
         <button class="secondary" onclick="editSupplier('${s.id}')">Editar</button>
         <button class="danger" onclick="deleteRow('suppliers', '${s.id}', loadSuppliers)">Excluir</button>
@@ -237,6 +240,7 @@ async function loadSuppliers() {
 
 $('new-supplier-btn').addEventListener('click', () => {
   $('supplier-id').value = ''; $('supplier-name').value = ''; $('supplier-contact').value = ''; $('supplier-notes').value = '';
+  ['supplier-legal-name', 'supplier-cnpj', 'supplier-ie', 'supplier-email', 'supplier-phone'].forEach(i => { $(i).value = ''; });
   $('supplier-form').classList.remove('hidden');
 });
 $('cancel-supplier-btn').addEventListener('click', () => $('supplier-form').classList.add('hidden'));
@@ -245,6 +249,8 @@ window.editSupplier = (id) => {
   const s = cache.suppliers.find(x => x.id === id);
   $('supplier-id').value = s.id; $('supplier-name').value = s.name;
   $('supplier-contact').value = s.contact || ''; $('supplier-notes').value = s.notes || '';
+  $('supplier-legal-name').value = s.legal_name || ''; $('supplier-cnpj').value = s.cnpj || ''; $('supplier-ie').value = s.state_registration || '';
+  $('supplier-email').value = s.email || ''; $('supplier-phone').value = s.phone || '';
   $('supplier-form').classList.remove('hidden');
 };
 
@@ -255,6 +261,13 @@ $('save-supplier-btn').addEventListener('click', async () => {
     contact: $('supplier-contact').value.trim(),
     notes: $('supplier-notes').value.trim()
   };
+  if (suppliersV2) {
+    payload.legal_name = $('supplier-legal-name').value.trim() || null;
+    payload.cnpj = $('supplier-cnpj').value.trim() || null;
+    payload.state_registration = $('supplier-ie').value.trim() || null;
+    payload.email = $('supplier-email').value.trim() || null;
+    payload.phone = $('supplier-phone').value.trim() || null;
+  }
   if (!payload.name) { toast('Informe o nome do fornecedor'); return; }
   const q = id ? sb.from('suppliers').update(payload).eq('id', id) : sb.from('suppliers').insert(payload);
   const { error } = await q;
@@ -545,16 +558,28 @@ async function getProposalItems(projectId) {
 }
 
 const PURCHASE_SELECT_V2 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost), purchase_allocations(id, project_id, proposal_item_id, amount, pct, projects(name), proposal_items(description, quantity, estimated_unit_cost))';
+const PURCHASE_SELECT_V3 = PURCHASE_SELECT_V2 + ', purchase_installments(id, seq, days_after_purchase, amount, payment_id)';
+// false enquanto o banco ainda não recebeu o script v2_etapa2_compras.sql
+let installmentsAvailable = false;
+// false enquanto o banco ainda não recebeu as colunas novas de fornecedor
+let suppliersV2 = false;
 const PURCHASE_SELECT_V1 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost)';
 
 async function loadPurchases() {
-  let res = await sb.from('purchases').select(PURCHASE_SELECT_V2).order('priority');
-  if (res.error) {
-    // Banco ainda sem o script v2_etapa1_cotacoes.sql: continua funcionando no modo antigo.
-    allocationsAvailable = false;
-    res = await sb.from('purchases').select(PURCHASE_SELECT_V1).order('priority');
-  } else {
+  let res = await sb.from('purchases').select(PURCHASE_SELECT_V3).order('priority');
+  if (!res.error) {
     allocationsAvailable = true;
+    installmentsAvailable = true;
+  } else {
+    installmentsAvailable = false;
+    res = await sb.from('purchases').select(PURCHASE_SELECT_V2).order('priority');
+    if (!res.error) {
+      allocationsAvailable = true;
+    } else {
+      // Banco ainda sem o script v2_etapa1_cotacoes.sql: continua funcionando no modo antigo.
+      allocationsAvailable = false;
+      res = await sb.from('purchases').select(PURCHASE_SELECT_V1).order('priority');
+    }
   }
   if (res.error) { toast(res.error.message); return; }
   const data = res.data;
@@ -586,6 +611,7 @@ async function loadPurchases() {
       </td>
     </tr>`;
   }).join('');
+  renderCompras();
   await loadDashboard();
 }
 
@@ -972,7 +998,235 @@ window.deleteQuoteAttachment = async (id, path) => {
 };
 
 // ============================================================
-// SERVIÇOS TERCEIRIZADOS
+// COMPRAS — V2 etapa 2 (cotações "realizado" + parcelas + fornecedor)
+// ============================================================
+const addDays = (isoDate, days) => {
+  if (!isoDate) return null;
+  const d = new Date(isoDate + 'T12:00:00');
+  d.setDate(d.getDate() + (Number(days) || 0));
+  return d.toISOString().slice(0, 10);
+};
+
+const purchaseTotal = (p) => {
+  if (p.document_total != null && Number(p.document_total) > 0) return Number(p.document_total);
+  const allocs = p.purchase_allocations || [];
+  if (allocs.length > 1) return allocs.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  return Number(p.actual_cost) || 0;
+};
+
+function paymentSummary(p) {
+  const inst = (p.purchase_installments || []).slice().sort((a, b) => a.seq - b.seq);
+  if (!inst.length) return '<span class="muted">-</span>';
+  const entry = inst.find(i => i.seq === 0);
+  const rest = inst.filter(i => i.seq > 0);
+  const txt = (entry ? `Entrada ${brl(entry.amount)}` : '') + (entry && rest.length ? ' + ' : '') +
+    (rest.length ? `${rest.length}x (${rest.map(i => i.days_after_purchase).join('/')} dias)` : '');
+  const allGen = inst.every(i => i.payment_id);
+  return `${txt}<br>${allGen ? '<span style="color:var(--success)">✓ pagamentos gerados</span>' : '<span class="muted">pagamentos não gerados</span>'}`;
+}
+
+function renderCompras() {
+  $('compras-v2-notice').classList.toggle('hidden', installmentsAvailable);
+  const list = (cache.purchases || []).filter(p => p.status === 'realizado');
+  $('compras-table').innerHTML = list.map(p => {
+    const allocs = p.purchase_allocations || [];
+    const multi = allocs.length > 1;
+    const estimado = multi ? allocs.reduce((s, a) => s + itemEstimate(a.proposal_items), 0) : itemEstimate(p.proposal_items);
+    const fechado = multi ? allocs.reduce((s, a) => s + (Number(a.amount) || 0), 0) : (Number(p.actual_cost) || 0);
+    const base = estimado || (Number(p.budgeted_cost) || 0);
+    const economia = base - fechado;
+    const projetos = multi ? allocs.map(a => a.projects?.name).filter(Boolean).join(' + ') : (p.projects?.name || '');
+    return `<tr>
+      <td class="num">${p.priority ?? 0}</td>
+      <td>${projetos}</td><td>${p.description}</td><td>${p.suppliers?.name || '<span class="muted">-</span>'}</td>
+      <td class="num">${estimado ? brl(estimado) : '-'}</td>
+      <td class="num">${fechado ? brl(fechado) : '-'}</td>
+      <td class="num" style="color:${economia >= 0 ? 'var(--success)' : 'var(--danger)'}">${fechado ? brl(economia) : '-'}</td>
+      <td>${fmtDate(p.purchase_date)}</td>
+      <td>${fmtDate(p.expected_delivery_date)}<br><b>${fmtDate(p.delivery_date)}</b></td>
+      <td>${paymentSummary(p)}</td>
+      <td class="list-actions">
+        <button class="secondary" onclick="openCompraPanel('${p.id}')">Pagamento</button>
+        <button class="secondary" onclick="compraAttachments('${p.id}')">Anexos</button>
+        <button class="secondary" onclick="compraEdit('${p.id}')">Editar</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td class="muted" colspan="11">Nenhuma compra ainda. Quando uma cotação ficar com status "realizado", ela aparece aqui.</td></tr>';
+}
+
+window.compraAttachments = async (id) => { showView('purchases'); await openPurchaseAttachments(id); };
+window.compraEdit = async (id) => { showView('purchases'); await editPurchase(id); };
+
+// ---------- Painel de pagamento da compra ----------
+let currentCompraId = null;
+let installRows = [];   // [{ seq, days, amount, payment_id }] — seq 0 = entrada
+
+const compraPurchase = () => cache.purchases.find(p => p.id === currentCompraId);
+
+function fillCompraSupplierSelect(selected) {
+  $('compra-supplier').innerHTML = '<option value="">-</option>' +
+    cache.suppliers.map(s => `<option value="${s.id}" ${s.id === selected ? 'selected' : ''}>${s.name}</option>`).join('');
+}
+
+window.openCompraPanel = (id) => {
+  if (!installmentsAvailable) { toast('Rode antes o script v2_etapa2_compras.sql no Supabase'); return; }
+  currentCompraId = id;
+  const p = compraPurchase();
+  $('compra-panel-title').textContent = `Pagamento — ${p.description}`;
+  $('compra-total').textContent = brl(purchaseTotal(p));
+  $('compra-date').textContent = fmtDate(p.purchase_date);
+  $('compra-multi-note').classList.toggle('hidden', (p.purchase_allocations || []).length < 2);
+  fillCompraSupplierSelect(p.supplier_id);
+  $('compra-supplier-form').classList.add('hidden');
+  const inst = (p.purchase_installments || []).slice().sort((a, b) => a.seq - b.seq);
+  installRows = inst.map(i => ({ seq: i.seq, days: i.days_after_purchase, amount: Number(i.amount) || 0, payment_id: i.payment_id }));
+  const entry = installRows.find(r => r.seq === 0);
+  $('compra-entry').value = entry ? entry.amount : '';
+  $('compra-nparcelas').value = installRows.filter(r => r.seq > 0).length;
+  renderInstallments();
+  $('compra-panel').classList.remove('hidden');
+  $('compra-panel').scrollIntoView({ behavior: 'smooth' });
+};
+
+$('close-compra-panel').addEventListener('click', () => { $('compra-panel').classList.add('hidden'); currentCompraId = null; });
+
+function syncInstallRowsToInputs() {
+  const n = Math.max(0, Math.min(12, Number($('compra-nparcelas').value) || 0));
+  const entryVal = Number($('compra-entry').value) || 0;
+  const rest = installRows.filter(r => r.seq > 0).sort((a, b) => a.seq - b.seq);
+  while (rest.length < n) rest.push({ seq: rest.length + 1, days: (rest.length + 1) * 30, amount: 0, payment_id: null });
+  rest.length = n;
+  const entry = installRows.find(r => r.seq === 0);
+  const rows = [];
+  if (entryVal > 0 || (entry && entry.payment_id)) rows.push({ seq: 0, days: 0, amount: entryVal, payment_id: entry ? entry.payment_id : null });
+  installRows = rows.concat(rest);
+}
+
+function renderInstallments() {
+  const p = compraPurchase();
+  $('compra-installments').innerHTML = installRows.map((r, i) => `<tr>
+    <td>${r.seq === 0 ? 'Entrada' : 'Parcela ' + r.seq}</td>
+    <td>${r.seq === 0 ? '0' : `<input type="number" min="0" step="1" value="${r.days}" style="width:80px" onchange="installChange(${i}, 'days', this.value)">`}</td>
+    <td>${r.seq === 0 ? brl(r.amount) : `<input type="number" step="0.01" value="${r.amount}" style="width:120px" onchange="installChange(${i}, 'amount', this.value)">`}</td>
+    <td>${p.purchase_date ? fmtDate(addDays(p.purchase_date, r.days)) : '-'}</td>
+    <td>${r.payment_id ? '<span style="color:var(--success)">✓ gerado</span>' : '<span class="muted">não gerado</span>'}</td>
+  </tr>`).join('') || '<tr><td class="muted" colspan="5">Informe a entrada e/ou o número de parcelas.</td></tr>';
+  const total = purchaseTotal(p);
+  const sum = installRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const diff = Number((total - sum).toFixed(2));
+  $('compra-plan-sum').textContent = installRows.length ? `Soma das parcelas: ${brl(sum)} de ${brl(total)}` + (diff ? ` — diferença ${brl(diff)}` : ' ✓') : '';
+  $('compra-plan-sum').style.color = installRows.length && diff ? 'var(--danger)' : 'var(--success)';
+}
+
+window.installChange = (i, field, val) => {
+  const r = installRows[i];
+  if (field === 'days') r.days = Math.max(0, Math.round(Number(val) || 0));
+  else r.amount = Number(val) || 0;
+  renderInstallments();
+};
+
+$('compra-entry').addEventListener('input', () => { syncInstallRowsToInputs(); renderInstallments(); });
+$('compra-nparcelas').addEventListener('input', () => { syncInstallRowsToInputs(); renderInstallments(); });
+
+$('compra-distribute-btn').addEventListener('click', () => {
+  syncInstallRowsToInputs();
+  const p = compraPurchase();
+  const entry = installRows.find(r => r.seq === 0);
+  const rest = installRows.filter(r => r.seq > 0);
+  if (!rest.length) { toast('Informe o número de parcelas'); return; }
+  const remaining = purchaseTotal(p) - (entry ? entry.amount : 0);
+  const each = Math.floor(remaining / rest.length * 100) / 100;
+  rest.forEach((r, i) => { r.amount = i === rest.length - 1 ? Number((remaining - each * (rest.length - 1)).toFixed(2)) : each; });
+  renderInstallments();
+});
+
+// ---------- Fornecedor (cadastro rápido dentro da compra) ----------
+$('compra-new-supplier-btn').addEventListener('click', () => {
+  ['cs-name', 'cs-legal-name', 'cs-cnpj', 'cs-ie', 'cs-email', 'cs-phone'].forEach(id => { $(id).value = ''; });
+  $('compra-supplier-form').classList.remove('hidden');
+});
+$('compra-cancel-supplier-btn').addEventListener('click', () => $('compra-supplier-form').classList.add('hidden'));
+$('compra-save-supplier-btn').addEventListener('click', async () => {
+  const payload = { name: $('cs-name').value.trim() || $('cs-legal-name').value.trim() };
+  if (!payload.name) { toast('Informe o nome ou a razão social'); return; }
+  if (suppliersV2) {
+    payload.legal_name = $('cs-legal-name').value.trim() || null;
+    payload.cnpj = $('cs-cnpj').value.trim() || null;
+    payload.state_registration = $('cs-ie').value.trim() || null;
+    payload.email = $('cs-email').value.trim() || null;
+    payload.phone = $('cs-phone').value.trim() || null;
+  }
+  const { data, error } = await sb.from('suppliers').insert(payload).select('id').single();
+  if (error) { toast(error.message); return; }
+  await loadSuppliers(); fillProjectSelects();
+  fillCompraSupplierSelect(data.id);
+  $('compra-supplier-form').classList.add('hidden');
+  toast('Fornecedor cadastrado');
+});
+
+// ---------- Salvar condições e gerar pagamentos ----------
+async function saveCompraPlan() {
+  syncInstallRowsToInputs();
+  const id = currentCompraId;
+  const rows = installRows.filter(r => (Number(r.amount) || 0) > 0 || r.payment_id);
+  const keepSeqs = rows.map(r => r.seq);
+  // remove parcelas que não existem mais (e ainda não geraram pagamento)
+  const { data: existing } = await sb.from('purchase_installments').select('id, seq, payment_id').eq('purchase_id', id);
+  const toDelete = (existing || []).filter(e => !keepSeqs.includes(e.seq) && !e.payment_id).map(e => e.id);
+  if (toDelete.length) await sb.from('purchase_installments').delete().in('id', toDelete);
+  if (rows.length) {
+    const { error } = await sb.from('purchase_installments').upsert(rows.map(r => ({
+      purchase_id: id, seq: r.seq, days_after_purchase: r.days, amount: r.amount
+    })), { onConflict: 'purchase_id,seq' });
+    if (error) { toast(error.message); return false; }
+  }
+  const entry = rows.find(r => r.seq === 0);
+  const n = rows.filter(r => r.seq > 0).length;
+  const { error: e2 } = await sb.from('purchases').update({
+    supplier_id: $('compra-supplier').value || null,
+    forma_pagamento: rows.length ? `${entry ? 1 : 0}+${n}` : null
+  }).eq('id', id);
+  if (e2) { toast(e2.message); return false; }
+  return true;
+}
+
+$('compra-save-plan-btn').addEventListener('click', async () => {
+  if (!(await saveCompraPlan())) return;
+  const id = currentCompraId;
+  await loadPurchases();
+  if (id) openCompraPanel(id);
+  toast('Condições de pagamento salvas');
+});
+
+$('compra-generate-btn').addEventListener('click', async () => {
+  const p0 = compraPurchase();
+  if (!p0.purchase_date) { toast('Informe a data da compra (em Editar) antes de gerar pagamentos'); return; }
+  if (!(await saveCompraPlan())) return;
+  const id = currentCompraId;
+  await loadPurchases();
+  const p = cache.purchases.find(x => x.id === id);
+  const supplierId = $('compra-supplier').value || p.supplier_id || null;
+  const pending = (p.purchase_installments || []).filter(i => !i.payment_id && Number(i.amount) > 0).sort((a, b) => a.seq - b.seq);
+  if (!pending.length) { toast('Nada a gerar: defina as parcelas ou os pagamentos já foram gerados'); openCompraPanel(id); return; }
+  let made = 0;
+  for (const i of pending) {
+    const { data: pay, error } = await sb.from('payments').insert({
+      purchase_id: id, project_id: p.project_id, supplier_id: supplierId,
+      amount: i.amount, due_date: addDays(p.purchase_date, i.days_after_purchase), status: 'previsto',
+      notes: `${p.description} — ${i.seq === 0 ? 'entrada' : 'parcela ' + i.seq}`
+    }).select('id').single();
+    if (error) { toast('Erro ao gerar pagamento: ' + error.message); break; }
+    await sb.from('purchase_installments').update({ payment_id: pay.id }).eq('id', i.id);
+    made++;
+  }
+  await loadPurchases();
+  await loadPayments();
+  openCompraPanel(id);
+  toast(`${made} pagamento(s) gerado(s)`);
+});
+
+// ============================================================
+// SERVIÇOS TERCEIRIZADOS (não usado no menu desde a V2)
 // ============================================================
 async function loadServices() {
   const { data, error } = await sb.from('outsourced_services').select('*, projects(name), suppliers(name)').order('priority');

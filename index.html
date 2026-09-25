@@ -57,7 +57,7 @@
       <a href="#suppliers" data-view="suppliers">Fornecedores</a>
       <a href="#projects" data-view="projects">Projetos &amp; Propostas</a>
       <a href="#purchases" data-view="purchases">Cotações</a>
-      <a href="#services" data-view="services">Compras</a>
+      <a href="#compras" data-view="compras">Compras</a>
       <a href="#stages" data-view="stages">Etapas de Produção</a>
       <a href="#payments" data-view="payments">Pagamentos (cliente→fornecedor)</a>
       <a href="#receivables" data-view="receivables">Recebimentos (cliente→Pro Cooler)</a>
@@ -114,8 +114,17 @@
       <div class="toolbar"><h2>Fornecedores</h2><button id="new-supplier-btn">+ Novo fornecedor</button></div>
       <div id="supplier-form" class="card hidden">
         <div class="row">
-          <div class="field"><label>Nome</label><input id="supplier-name"></div>
-          <div class="field"><label>Contato</label><input id="supplier-contact"></div>
+          <div class="field"><label>Nome (uso diário)</label><input id="supplier-name"></div>
+          <div class="field"><label>Razão social</label><input id="supplier-legal-name"></div>
+          <div class="field"><label>CNPJ</label><input id="supplier-cnpj"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Inscrição estadual</label><input id="supplier-ie"></div>
+          <div class="field"><label>E-mail</label><input id="supplier-email" type="email"></div>
+          <div class="field"><label>Telefone</label><input id="supplier-phone"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Contato (pessoa)</label><input id="supplier-contact"></div>
         </div>
         <div class="field"><label>Observações</label><textarea id="supplier-notes" rows="2"></textarea></div>
         <input type="hidden" id="supplier-id">
@@ -123,7 +132,7 @@
         <button class="secondary" id="cancel-supplier-btn">Cancelar</button>
       </div>
       <div class="card">
-        <table><thead><tr><th>Nome</th><th>Contato</th><th></th></tr></thead>
+        <table><thead><tr><th>Nome</th><th>Razão social / CNPJ</th><th>Contato</th><th></th></tr></thead>
         <tbody id="suppliers-table"></tbody></table>
       </div>
     </section>
@@ -372,7 +381,59 @@
       </div>
     </section>
 
-    <!-- SERVIÇOS TERCEIRIZADOS -->
+    <!-- COMPRAS (cotações com status "realizado") -->
+    <section id="view-compras" class="view">
+      <div class="toolbar"><h2>Compras</h2></div>
+      <p class="muted">Aqui aparecem as cotações com status <b>realizado</b>. Para mudar valores ou datas, use <b>Editar</b> (abre a cotação); para o pedido e comprovantes, use <b>Anexos</b>.</p>
+      <p id="compras-v2-notice" class="muted hidden" style="color:#b7791f">Atenção: o banco ainda não recebeu o script <b>v2_etapa2_compras.sql</b>. Enquanto isso, parcelas e o cadastro completo do fornecedor ficam desligados.</p>
+      <div class="card">
+        <table><thead><tr><th>Prior.</th><th>Projeto(s)</th><th>Materiais orçados</th><th>Fornecedor</th><th>Estimado</th><th>Fechado</th><th>Economia</th><th>Compra</th><th>Entrega<br>prev. / real</th><th>Pagamento</th><th></th></tr></thead>
+        <tbody id="compras-table"></tbody></table>
+      </div>
+
+      <div id="compra-panel" class="card hidden">
+        <div class="toolbar">
+          <h3 id="compra-panel-title">Pagamento</h3>
+          <button class="secondary" id="close-compra-panel">Fechar</button>
+        </div>
+        <div class="row">
+          <div class="field"><label>Fornecedor</label><select id="compra-supplier"></select></div>
+          <div style="display:flex;align-items:flex-end"><button type="button" class="secondary" id="compra-new-supplier-btn">+ Novo fornecedor</button></div>
+        </div>
+        <div id="compra-supplier-form" class="hidden" style="margin:8px 0">
+          <div class="row">
+            <div class="field"><label>Nome (uso diário)</label><input id="cs-name"></div>
+            <div class="field"><label>Razão social</label><input id="cs-legal-name"></div>
+            <div class="field"><label>CNPJ</label><input id="cs-cnpj"></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Inscrição estadual</label><input id="cs-ie"></div>
+            <div class="field"><label>E-mail</label><input id="cs-email" type="email"></div>
+            <div class="field"><label>Telefone</label><input id="cs-phone"></div>
+          </div>
+          <button type="button" id="compra-save-supplier-btn">Cadastrar fornecedor</button>
+          <button type="button" class="secondary" id="compra-cancel-supplier-btn">Cancelar</button>
+        </div>
+
+        <h3 style="margin-top:14px">Condições de pagamento</h3>
+        <p class="muted">Valor total: <b id="compra-total"></b> &middot; Data da compra: <b id="compra-date"></b> &middot; os dias das parcelas contam a partir da data da compra (a entrada é paga no dia 0).</p>
+        <div class="row">
+          <div class="field"><label>Entrada (R$)</label><input id="compra-entry" type="number" step="0.01"></div>
+          <div class="field"><label>Nº de parcelas (além da entrada)</label><input id="compra-nparcelas" type="number" min="0" max="12" step="1" value="0"></div>
+          <div style="display:flex;align-items:flex-end"><button type="button" class="secondary" id="compra-distribute-btn">Distribuir o restante igualmente</button></div>
+        </div>
+        <table class="items-table">
+          <thead><tr><th>Parcela</th><th>Dias após a compra</th><th>Valor (R$)</th><th>Vencimento</th><th>Pagamento</th></tr></thead>
+          <tbody id="compra-installments"></tbody>
+        </table>
+        <p id="compra-plan-sum" class="muted"></p>
+        <p id="compra-multi-note" class="muted hidden">Compra dividida entre projetos: os pagamentos são lançados no projeto principal (o primeiro do rateio).</p>
+        <button id="compra-save-plan-btn">Salvar condições</button>
+        <button class="secondary" id="compra-generate-btn">Gerar pagamentos</button>
+      </div>
+    </section>
+
+    <!-- SERVIÇOS TERCEIRIZADOS (não usado no menu desde a V2) -->
     <section id="view-services" class="view">
       <div class="toolbar"><h2>Serviços Terceirizados</h2><button id="new-service-btn">+ Novo serviço</button></div>
       <p class="muted">Pintura, corte, laminação e outros serviços feitos por prestadores externos. Marque "cobrado do cliente" quando esse custo é repassado a ele — senão fica visível só como etapa, sem valor.</p>

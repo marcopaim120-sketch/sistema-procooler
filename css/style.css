@@ -242,7 +242,12 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 #toast.show { opacity: 1; transform: translateY(0); }
 /* Cotações: tabela larga (muitas colunas) — compacta e quebra os botões em 2 linhas */
 #view-purchases .card { overflow-x: auto; }
+#view-compras .card { overflow-x: auto; }
 #view-purchases table { font-size: 12px; }
+#view-compras table { font-size: 12px; }
 #view-purchases th, #view-purchases td { padding: 6px 6px; }
+#view-compras th, #view-compras td { padding: 6px 6px; }
 #view-purchases .list-actions { flex-wrap: wrap; width: 132px; gap: 4px; }
+#view-compras .list-actions { flex-wrap: wrap; width: 132px; gap: 4px; }
 #view-purchases .list-actions button { padding: 4px 8px; }
+#view-compras .list-actions button { padding: 4px 8px; }
