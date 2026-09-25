@@ -565,40 +565,75 @@ let installmentsAvailable = false;
 let suppliersV2 = false;
 const PURCHASE_SELECT_V1 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost)';
 
-// ---------- Saldo encadeado do Estimado ----------
-// O Estimado de cada item da proposta (de cada projeto) vai sendo consumido pelas
+// ---------- Saldo compartilhado do Estimado ----------
+// Itens da proposta que já foram comprados JUNTOS (na mesma cotação) passam a
+// dividir um único saldo (ex.: o "Ferro" do projeto A + o "Ferro" do projeto B).
+// O saldo começa com a soma dos Estimados desses itens e vai sendo consumido pelas
 // compras "realizado", em ordem de data da compra (empate: ordem de criação).
-// O Estimado mostrado numa cotação é o SALDO do item antes dela; a Economia é
-// esse saldo menos o fechado (fica negativa/vermelha se a compra passar do saldo).
+// O Estimado mostrado numa cotação é o saldo ANTES dela; a Economia é esse saldo
+// menos o fechado (negativa/vermelha se a compra passar do saldo).
 function computePurchaseCalc(list) {
-  const calc = {};
-  const consumed = {}; // proposal_item_id -> total já comprado (compras realizadas)
-  const key = (p) => (p.purchase_date || '9999-12-31') + '|' + (p.created_at || '');
-  const ordered = list.slice().sort((x, y) => (key(x) < key(y) ? -1 : key(x) > key(y) ? 1 : 0));
-  for (const p of ordered) {
+  const lineOf = (p) => {
     const allocs = p.purchase_allocations || [];
-    const lines = allocs.length
+    return allocs.length
       ? allocs.map(l => ({ itemId: l.proposal_item_id, item: l.proposal_items, amount: Number(l.amount) || 0, project: l.projects?.name || '' }))
       : [{ itemId: p.proposal_item_id, item: p.proposal_items, amount: Number(p.actual_cost) || 0, project: p.projects?.name || '' }];
-    let estimado = 0, fechado = 0, fechadoLinked = 0;
-    const names = [], notes = [];
+  };
+
+  // 1. grupos de itens ligados por cotações (union-find)
+  const parent = {};
+  const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  const union = (x, y) => { const rx = find(x), ry = find(y); if (rx !== ry) parent[ry] = rx; };
+  const itemInfo = {}; // itemId -> { est, name }
+  const linesByPurchase = {};
+  for (const p of list) {
+    const lines = lineOf(p);
+    linesByPurchase[p.id] = lines;
+    const ids = [];
+    for (const l of lines) {
+      if (!l.itemId || !l.item) continue;
+      if (parent[l.itemId] === undefined) parent[l.itemId] = l.itemId;
+      itemInfo[l.itemId] = { est: itemEstimate(l.item), name: l.item.description || '' };
+      ids.push(l.itemId);
+    }
+    ids.slice(1).forEach(id => union(ids[0], id));
+  }
+  const pool = {}; // raiz -> { est, names, consumed }
+  for (const id of Object.keys(itemInfo)) {
+    const r = find(id);
+    pool[r] = pool[r] || { est: 0, names: [], consumed: 0 };
+    pool[r].est += itemInfo[id].est;
+    if (itemInfo[id].name && !pool[r].names.includes(itemInfo[id].name)) pool[r].names.push(itemInfo[id].name);
+  }
+
+  // 2. percorre as cotações em ordem de data consumindo o saldo
+  const key = (p) => (p.purchase_date || '9999-12-31') + '|' + (p.created_at || '');
+  const ordered = list.slice().sort((x, y) => (key(x) < key(y) ? -1 : key(x) > key(y) ? 1 : 0));
+  const calc = {};
+  for (const p of ordered) {
+    const lines = linesByPurchase[p.id];
+    let fechado = 0, fechadoLinked = 0, estimado = 0;
+    const names = [], notes = [], byRoot = {};
     for (const l of lines) {
       fechado += l.amount;
       if (l.itemId && l.item) {
-        const est = itemEstimate(l.item);
-        const before = consumed[l.itemId] || 0;
-        estimado += est - before;
+        const r = find(l.itemId);
+        byRoot[r] = (byRoot[r] || 0) + l.amount;
         fechadoLinked += l.amount;
         if (l.item.description) names.push(l.item.description);
-        if (before > 0) notes.push(`${l.project ? l.project + ': ' : ''}${brl(est)} − ${brl(before)} já comprado`);
-        if (p.status === 'realizado') consumed[l.itemId] = before + l.amount;
       }
     }
-    const linked = names.length > 0 || estimado !== 0;
+    for (const r of Object.keys(byRoot)) {
+      const g = pool[r];
+      estimado += g.est - g.consumed;
+      if (g.consumed > 0) notes.push(`saldo de ${g.names.join(' + ')}: ${brl(g.est)} − ${brl(g.consumed)} já comprado`);
+      if (p.status === 'realizado') g.consumed += byRoot[r];
+    }
+    const linked = names.length > 0;
     calc[p.id] = {
       estimado, fechado,
       economia: linked ? estimado - fechadoLinked : (Number(p.budgeted_cost) || 0) - fechado,
-      projetos: allocs.length > 1 ? allocs.map(l => l.projects?.name).filter(Boolean).join(' + ') : (p.projects?.name || ''),
+      projetos: (p.purchase_allocations || []).length > 1 ? p.purchase_allocations.map(l => l.projects?.name).filter(Boolean).join(' + ') : (p.projects?.name || ''),
       materiais: names.length
         ? `<b>${names.join(' + ')}</b><div class="muted" style="font-size:10px;line-height:1.2">${p.description}</div>`
         : p.description,
