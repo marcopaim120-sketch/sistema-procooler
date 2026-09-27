@@ -160,11 +160,13 @@ function render(data) {
       <td>${renderDocLinks(q.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma cotação de serviço registrada ainda.</td></tr>';
 
-  // Etapas de produção
+  // Etapas de produção (agrupadas; só as marcadas como visíveis ao cliente já vêm filtradas pelo banco)
   document.getElementById('stages-list').innerHTML = (stages || []).map(s => `
-    <tr><td>${s.name}</td><td>${s.start_date || '-'}</td><td>${s.due_date || '-'}</td><td>${s.end_date || '-'}</td>
-      <td><span class="badge ${statusColor(s.status)}">${statusLabel[s.status] || s.status}</span></td><td>${s.billable_to_client ? brl(s.cost) : '-'}</td></tr>
-  `).join('') || '<tr><td class="muted">Nenhuma etapa registrada ainda.</td></tr>';
+    <tr><td>${s.group_name}</td><td>${s.group_seq}.${s.seq}</td><td>${s.name}</td>
+      <td>${s.start_date || '-'}</td><td>${s.due_date || '-'}</td>
+      <td>${s.end_date || '-'}${s.received_ok ? ' ✓' : ''}</td>
+      <td><span class="badge ${statusColor(s.status)}">${statusLabel[s.status] || s.status}</span></td></tr>
+  `).join('') || '<tr><td class="muted" colspan="7">Nenhuma etapa registrada ainda.</td></tr>';
 
   // Cotações de fornecedores comparadas
   document.getElementById('quotes-list').innerHTML = (purchase_quotes || []).map(q => `

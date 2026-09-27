@@ -312,7 +312,7 @@
         <button class="secondary" id="cancel-purchase-btn">Cancelar</button>
       </div>
       <div class="card">
-        <table><thead><tr><th>Prior.</th><th>Projeto(s)</th><th>Materiais orçados</th><th>Fornecedor</th><th>Estimado</th><th>Orçado</th><th>Fechado</th><th>Economia</th><th>Compra<br>prev. / real</th><th>Entrega<br>prev. / real</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Prior.</th><th>Projeto(s)</th><th>Materiais orçados</th><th>Fornecedor</th><th>Estimado</th><th>Orçado</th><th>Fechado</th><th>Economia</th><th>Compra<br>prev. / real</th><th>Entrega<br>prev. / real</th><th>Status</th><th>Cliente</th><th></th></tr></thead>
         <tbody id="purchases-table"></tbody></table>
       </div>
 
@@ -387,7 +387,7 @@
       <p class="muted">Aqui aparecem as cotações com status <b>realizado</b>. Para mudar valores ou datas, use <b>Editar</b> (abre a cotação); para o pedido e comprovantes, use <b>Anexos</b>.</p>
       <p id="compras-v2-notice" class="muted hidden" style="color:#b7791f">Atenção: o banco ainda não recebeu o script <b>v2_etapa2_compras.sql</b>. Enquanto isso, parcelas e o cadastro completo do fornecedor ficam desligados.</p>
       <div class="card">
-        <table><thead><tr><th>Prior.</th><th>Projeto(s)</th><th>Materiais orçados</th><th>Fornecedor</th><th>Estimado</th><th>Fechado</th><th>Economia</th><th>Compra</th><th>Entrega<br>prev. / real</th><th>Pagamento</th><th></th></tr></thead>
+        <table><thead><tr><th>Prior.</th><th>Projeto(s)</th><th>Materiais orçados</th><th>Fornecedor</th><th>Estimado</th><th>Fechado</th><th>Economia</th><th>Compra</th><th>Entrega<br>prev. / real</th><th>Pagamento</th><th>Cliente</th><th></th></tr></thead>
         <tbody id="compras-table"></tbody></table>
       </div>
 
@@ -549,44 +549,59 @@
 
     <!-- ETAPAS DE PRODUÇÃO -->
     <section id="view-stages" class="view">
-      <div class="toolbar"><h2>Etapas de Produção</h2><button id="new-stage-btn">+ Nova etapa</button></div>
-      <p class="muted">Corte e laminação, montagem, colocação de peças, acabamento, entrega, instalação etc. Marque "cobrado do cliente" só quando o cliente realmente paga por aquela etapa — senão ele vê apenas o nome e o status, sem valor.</p>
+      <div class="toolbar"><h2>Etapas de Produção</h2></div>
+      <p class="muted">Organize a produção em <b>grupos</b> (ex.: por material — Ferro, MDF, Gabinetes...) e, dentro de cada grupo, as <b>etapas</b> em sequência (detalhamento, compras, produção, montagem...). A ordem obedece ao sequenciamento.</p>
+      <p id="stages-v2-notice" class="muted hidden" style="color:#b7791f">Atenção: o banco ainda não recebeu o script <b>v2_etapa3_etapas.sql</b>. Rode-o no Supabase para usar os grupos de etapas.</p>
+
+      <div class="row" style="align-items:flex-end">
+        <div class="field"><label>Projeto</label><select id="stages-project-filter"></select></div>
+        <div style="display:flex;align-items:flex-end"><button id="new-stage-group-btn">+ Novo grupo</button></div>
+      </div>
+
+      <!-- Form de grupo -->
+      <div id="stage-group-form" class="card hidden">
+        <div class="row">
+          <div class="field"><label>Projeto</label><select id="stage-group-project"></select></div>
+          <div class="field"><label>Sequência (ordem do grupo)</label><input id="stage-group-seq" type="number" step="1" placeholder="1"></div>
+          <div class="field"><label>Nome do grupo</label><input id="stage-group-name" placeholder="Ex: Ferro / Estruturas"></div>
+        </div>
+        <input type="hidden" id="stage-group-id">
+        <button id="save-stage-group-btn">Salvar grupo</button>
+        <button class="secondary" id="cancel-stage-group-btn">Cancelar</button>
+      </div>
+
+      <!-- Form de etapa -->
       <div id="stage-form" class="card hidden">
         <div class="row">
-          <div class="field"><label>Projeto</label><select id="stage-project"></select></div>
-          <div class="field"><label>Nome da etapa</label><input id="stage-name" placeholder="Ex: Corte e laminação"></div>
-          <div class="field"><label>Sequência (ordem)</label><input id="stage-sequence" type="number" step="1" placeholder="0 = primeira"></div>
+          <div class="field"><label>Grupo</label><select id="stage-group"></select></div>
+          <div class="field"><label>Sequência (dentro do grupo)</label><input id="stage-seq" type="number" step="1" placeholder="1"></div>
+          <div class="field"><label>Nome da etapa</label><input id="stage-name" placeholder="Ex: Detalhamento e medidas"></div>
         </div>
         <div class="row">
           <div class="field"><label>Status</label>
             <select id="stage-status">
-              <option value="iniciada">Iniciada</option>
+              <option value="iniciada">Iniciado</option>
               <option value="andamento">Em andamento</option>
-              <option value="concluida">Concluída</option>
+              <option value="concluida">Concluído</option>
             </select>
-          </div>
-          <div class="field">
-            <label><input type="checkbox" id="stage-billable" style="width:auto;vertical-align:middle"> Cobrado do cliente?</label>
           </div>
         </div>
         <div class="row">
           <div class="field"><label>Data de início</label><input id="stage-start-date" type="date"></div>
-          <div class="field"><label>Prazo (previsão)</label><input id="stage-due-date" type="date"></div>
-          <div class="field"><label>Data de conclusão</label><input id="stage-end-date" type="date"></div>
+          <div class="field"><label>Dias estimados</label><input id="stage-estimated-days" type="number" step="1"></div>
+          <div class="field"><label>Data final estimada</label><input id="stage-due-date" type="date"></div>
         </div>
         <div class="row">
-          <div class="field"><label>Valor (R$) — só se cobrado</label><input id="stage-cost" type="number" step="0.01"></div>
-          <div class="field"><label>Forma de pagamento — só se cobrado</label><input id="stage-payment-terms" placeholder="Ex: à vista, 2x"></div>
+          <div class="field"><label>Data real de recebimento/entrega</label><input id="stage-end-date" type="date"></div>
+          <div class="field"><label><input type="checkbox" id="stage-received-ok" style="width:auto;vertical-align:middle"> Recebido/entregue (ok)</label></div>
         </div>
         <div class="field"><label>Observações (interno)</label><input id="stage-notes"></div>
         <input type="hidden" id="stage-id">
-        <button id="save-stage-btn">Salvar</button>
+        <button id="save-stage-btn">Salvar etapa</button>
         <button class="secondary" id="cancel-stage-btn">Cancelar</button>
       </div>
-      <div class="card">
-        <table><thead><tr><th>Ordem</th><th>Projeto</th><th>Etapa</th><th>Início</th><th>Prazo</th><th>Conclusão</th><th>Status</th><th>Cobrado?</th><th>Valor</th><th></th></tr></thead>
-        <tbody id="stages-table"></tbody></table>
-      </div>
+
+      <div id="stages-groups"></div>
     </section>
 
     <!-- PAGAMENTOS -->
@@ -620,7 +635,7 @@
         <button class="secondary" id="cancel-payment-btn">Cancelar</button>
       </div>
       <div class="card">
-        <table><thead><tr><th>Projeto</th><th>Fornecedor</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Projeto</th><th>Fornecedor</th><th>Valor</th><th>Vencimento</th><th>Pago em</th><th>Status</th><th>Cliente</th><th></th></tr></thead>
         <tbody id="payments-table"></tbody></table>
       </div>
       <div class="card">
@@ -673,7 +688,7 @@
         <button class="secondary" id="cancel-receivable-btn">Cancelar</button>
       </div>
       <div class="card">
-        <table><thead><tr><th>Projeto</th><th>Valor</th><th>Vencimento</th><th>Recebido em</th><th>Status</th><th></th></tr></thead>
+        <table><thead><tr><th>Projeto</th><th>Valor</th><th>Vencimento</th><th>Recebido em</th><th>Status</th><th>Cliente</th><th></th></tr></thead>
         <tbody id="receivables-table"></tbody></table>
       </div>
 

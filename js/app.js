@@ -139,9 +139,10 @@ async function refreshAll() {
 
 function fillProjectSelects() {
   const opts = cache.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-  ['purchase-project', 'service-project', 'stage-project', 'payment-project', 'receivable-project', 'document-project', 'client-preview-project'].forEach(id => {
+  ['purchase-project', 'service-project', 'stage-group-project', 'payment-project', 'receivable-project', 'document-project', 'client-preview-project'].forEach(id => {
     $(id).innerHTML = `<option value="">-</option>` + opts;
   });
+  $('stages-project-filter').innerHTML = `<option value="">Todos os projetos</option>` + opts;
   $('project-client').innerHTML = cache.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   const supplierOpts = `<option value="">-</option>` + cache.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   $('purchase-supplier').innerHTML = supplierOpts;
@@ -547,6 +548,20 @@ let allocRows = [];
 let proposalItemsCache = {};
 // false enquanto o banco ainda não recebeu o script v2_etapa1_cotacoes.sql
 let allocationsAvailable = true;
+// ---------- Chave "Mostrar ao cliente" (V2 etapa 4) ----------
+// true até prova em contrário: assim que uma tabela vier sem a coluna, o load daquela
+// tabela ajusta a flag e o botão de visibilidade some (nada quebra se o script não rodou).
+let visibilityAvailable = true;
+let stagesV2Available = true;
+const hasCol = (data, col) => data.length === 0 || Object.prototype.hasOwnProperty.call(data[0], col);
+window.toggleVisible = async (table, id, current, reload) => {
+  const { error } = await sb.from(table).update({ visible_to_client: !current }).eq('id', id);
+  if (error) { toast(error.message); return; }
+  await reload();
+};
+function visBtn(table, id, val, loaderName) {
+  return `<button class="secondary" title="${val ? 'Cliente vê — clique para ocultar' : 'Oculto do cliente — clique para mostrar'}" onclick="toggleVisible('${table}','${id}',${!!val},${loaderName})">${val ? '👁' : '🚫'}</button>`;
+}
 
 async function getProposalItems(projectId) {
   if (!projectId) return [];
@@ -663,6 +678,7 @@ async function loadPurchases() {
   const data = res.data;
   cache.purchases = data;
   cache.calc = computePurchaseCalc(data);
+  visibilityAvailable = hasCol(data, 'visible_to_client');
   $('purchase-v2-notice').classList.toggle('hidden', allocationsAvailable);
   $('purchases-table').innerHTML = data.map(p => {
     const { estimado, fechado, economia, projetos, materiais, notes } = cache.calc[p.id];
@@ -676,6 +692,7 @@ async function loadPurchases() {
       <td>${fmtDate(p.data_prevista_compra)}<br><b>${fmtDate(p.purchase_date)}</b></td>
       <td>${fmtDate(p.expected_delivery_date)}<br><b>${fmtDate(p.delivery_date)}</b></td>
       <td>${statusBadge(p.status)}</td>
+      <td>${visibilityAvailable ? visBtn('purchases', p.id, p.visible_to_client, 'loadPurchases') : ''}</td>
       <td class="list-actions">
         <button class="secondary" onclick="openQuotes('${p.id}')">Cotações</button>
         <button class="secondary" onclick="openPurchaseAttachments('${p.id}')">Anexos</button>
@@ -1113,13 +1130,14 @@ function renderCompras() {
       <td>${fmtDate(p.purchase_date)}</td>
       <td>${fmtDate(p.expected_delivery_date)}<br><b>${fmtDate(p.delivery_date)}</b></td>
       <td>${paymentSummary(p)}</td>
+      <td>${visibilityAvailable ? visBtn('purchases', p.id, p.visible_to_client, 'loadPurchases') : ''}</td>
       <td class="list-actions">
         <button class="secondary" onclick="openCompraPanel('${p.id}')">Pagamento</button>
         <button class="secondary" onclick="compraAttachments('${p.id}')">Anexos</button>
         <button class="secondary" onclick="compraEdit('${p.id}')">Editar</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td class="muted" colspan="11">Nenhuma compra ainda. Quando uma cotação ficar com status "realizado", ela aparece aqui.</td></tr>';
+  }).join('') || '<tr><td class="muted" colspan="12">Nenhuma compra ainda. Quando uma cotação ficar com status "realizado", ela aparece aqui.</td></tr>';
 }
 
 window.compraAttachments = async (id) => { showView('purchases'); await openPurchaseAttachments(id); };
@@ -1575,11 +1593,13 @@ async function loadPayments() {
   const { data, error } = await sb.from('payments').select('*, projects(name), suppliers(name)').order('due_date');
   if (error) { toast(error.message); return; }
   cache.payments = data;
+  visibilityAvailable = hasCol(data, 'visible_to_client');
   $('payments-table').innerHTML = data.map(p => `
     <tr>
       <td>${p.projects?.name || ''}</td><td>${p.suppliers?.name || ''}</td><td class="num">${brl(p.amount)}</td>
       <td>${p.due_date || ''}</td><td>${p.paid_date || ''}</td>
       <td>${statusBadge(p.status)}</td>
+      <td>${visibilityAvailable ? visBtn('payments', p.id, p.visible_to_client, 'loadPayments') : ''}</td>
       <td class="list-actions">
         <button class="secondary" onclick="editPayment('${p.id}')">Editar</button>
         <button class="secondary" onclick="openPaymentAttachments('${p.id}')">Anexos</button>
@@ -1704,11 +1724,13 @@ async function loadReceivables() {
   const { data, error } = await sb.from('receivables').select('*, projects(name)').order('due_date');
   if (error) { toast(error.message); return; }
   cache.receivables = data;
+  visibilityAvailable = hasCol(data, 'visible_to_client');
   $('receivables-table').innerHTML = data.map(r => `
     <tr>
       <td>${r.projects?.name || ''}</td><td class="num">${brl(r.amount)}</td>
       <td>${r.due_date || ''}</td><td>${r.paid_date || ''}</td>
       <td>${statusBadge(r.status)}</td>
+      <td>${visibilityAvailable ? visBtn('receivables', r.id, r.visible_to_client, 'loadReceivables') : ''}</td>
       <td class="list-actions">
         <button class="secondary" onclick="editReceivable('${r.id}')">Editar</button>
         <button class="secondary" onclick="openReceivableAttachments('${r.id}')">Anexos</button>
@@ -1814,70 +1836,164 @@ window.deleteReceivableAttachment = async (id, path) => {
 };
 
 // ============================================================
-// ETAPAS DE PRODUÇÃO
+// ETAPAS DE PRODUÇÃO — V2 etapa 3 (grupos + etapas em sequência)
 // ============================================================
 async function loadStages() {
-  const { data, error } = await sb.from('project_stages').select('*, projects(name)').order('sequence');
-  if (error) { toast(error.message); return; }
-  cache.stages = data;
-  $('stages-table').innerHTML = data.map(s => `
-    <tr>
-      <td class="num">${s.sequence}</td>
-      <td>${s.projects?.name || ''}</td><td>${s.name}</td>
-      <td>${s.start_date || '-'}</td><td>${s.due_date || '-'}</td><td>${s.end_date || '-'}</td>
+  const [groupsRes, stagesRes] = await Promise.all([
+    sb.from('project_stage_groups').select('*, projects(name)').order('seq'),
+    sb.from('project_stages').select('*').order('seq')
+  ]);
+  stagesV2Available = !groupsRes.error;
+  $('stages-v2-notice').classList.toggle('hidden', stagesV2Available);
+  if (groupsRes.error || stagesRes.error) {
+    cache.stageGroups = []; cache.stages = [];
+    $('stages-groups').innerHTML = '';
+    await loadDashboard();
+    return;
+  }
+  cache.stageGroups = groupsRes.data;
+  cache.stages = stagesRes.data;
+  renderStagesView();
+  await loadDashboard();
+}
+
+function renderStagesView() {
+  const filterProject = $('stages-project-filter').value;
+  const groups = cache.stageGroups
+    .filter(g => !filterProject || g.project_id === filterProject)
+    .slice()
+    .sort((a, b) => (a.project_id === b.project_id ? a.seq - b.seq : (a.projects?.name || '').localeCompare(b.projects?.name || '')));
+
+  $('stages-groups').innerHTML = groups.map(g => {
+    const stages = cache.stages.filter(s => s.group_id === g.id).slice().sort((a, b) => a.seq - b.seq);
+    const rows = stages.map(s => `<tr>
+      <td class="num">${g.seq}.${s.seq}</td>
+      <td>${s.name}</td>
+      <td>${fmtDate(s.start_date)} / ${s.estimated_days ?? '-'}d / <b>${fmtDate(s.due_date)}</b></td>
+      <td>${fmtDate(s.end_date)} ${s.received_ok ? '<span style="color:var(--success)">✓ ok</span>' : ''}</td>
       <td>${statusBadge(s.status)}</td>
-      <td>${s.billable_to_client ? 'Sim' : 'Não'}</td>
-      <td class="num">${s.billable_to_client ? brl(s.cost) : '-'}</td>
+      <td>${stagesV2Available ? visBtn('project_stages', s.id, s.visible_to_client, 'loadStages') : ''}</td>
       <td class="list-actions">
         <button class="secondary" onclick="editStage('${s.id}')">Editar</button>
         <button class="danger" onclick="deleteRow('project_stages', '${s.id}', loadStages)">Excluir</button>
       </td>
-    </tr>`).join('');
+    </tr>`).join('') || '<tr><td class="muted" colspan="7">Nenhuma etapa neste grupo ainda.</td></tr>';
+
+    return `<div class="card" style="margin-bottom:14px">
+      <div class="toolbar">
+        <h3>${g.seq}. ${g.name} <span class="muted" style="font-size:12px;font-weight:400">— ${g.projects?.name || ''}</span></h3>
+        <div class="list-actions">
+          <button onclick="newStageInGroup('${g.id}')">+ Nova etapa</button>
+          <button class="secondary" onclick="editStageGroup('${g.id}')">Editar grupo</button>
+          <button class="danger" onclick="deleteRow('project_stage_groups', '${g.id}', loadStages)">Excluir grupo</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Seq.</th><th>Etapa</th><th>Prazo estimado<br>início / dias / final</th><th>Recebimento/<br>Entrega</th><th>Status</th><th>Cliente</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('') || '<p class="muted">Nenhum grupo ainda. Clique em "+ Novo grupo" para começar.</p>';
 }
 
-$('new-stage-btn').addEventListener('click', () => {
-  $('stage-id').value = ''; $('stage-name').value = ''; $('stage-sequence').value = '0';
-  $('stage-status').value = 'iniciada'; $('stage-billable').checked = false;
-  $('stage-start-date').value = ''; $('stage-due-date').value = ''; $('stage-end-date').value = '';
-  $('stage-cost').value = ''; $('stage-payment-terms').value = ''; $('stage-notes').value = '';
-  $('stage-form').classList.remove('hidden');
+$('stages-project-filter').addEventListener('change', renderStagesView);
+
+// ---------- Grupo ----------
+$('new-stage-group-btn').addEventListener('click', () => {
+  if (!stagesV2Available) { toast('Rode antes o script v2_etapa3_etapas.sql no Supabase'); return; }
+  $('stage-group-id').value = '';
+  $('stage-group-project').value = $('stages-project-filter').value || '';
+  $('stage-group-seq').value = String(cache.stageGroups.length + 1);
+  $('stage-group-name').value = '';
+  $('stage-group-form').classList.remove('hidden');
+  $('stage-form').classList.add('hidden');
 });
-$('cancel-stage-btn').addEventListener('click', () => $('stage-form').classList.add('hidden'));
+$('cancel-stage-group-btn').addEventListener('click', () => $('stage-group-form').classList.add('hidden'));
+
+window.editStageGroup = (id) => {
+  const g = cache.stageGroups.find(x => x.id === id);
+  $('stage-group-id').value = g.id;
+  $('stage-group-project').value = g.project_id;
+  $('stage-group-seq').value = g.seq;
+  $('stage-group-name').value = g.name;
+  $('stage-group-form').classList.remove('hidden');
+  $('stage-form').classList.add('hidden');
+};
+
+$('save-stage-group-btn').addEventListener('click', async () => {
+  const id = $('stage-group-id').value;
+  const payload = {
+    project_id: $('stage-group-project').value,
+    seq: Number($('stage-group-seq').value) || 0,
+    name: $('stage-group-name').value.trim()
+  };
+  if (!payload.project_id || !payload.name) { toast('Informe projeto e nome do grupo'); return; }
+  const q = id ? sb.from('project_stage_groups').update(payload).eq('id', id) : sb.from('project_stage_groups').insert(payload);
+  const { error } = await q;
+  if (error) { toast(error.message); return; }
+  $('stage-group-form').classList.add('hidden');
+  await loadStages();
+  toast('Grupo salvo');
+});
+
+// ---------- Etapa ----------
+function fillStageGroupSelect(selected) {
+  $('stage-group').innerHTML = '<option value="">-</option>' + cache.stageGroups
+    .map(g => `<option value="${g.id}" ${g.id === selected ? 'selected' : ''}>${g.projects?.name || ''} — ${g.seq}. ${g.name}</option>`).join('');
+}
+
+window.newStageInGroup = (groupId) => {
+  if (!stagesV2Available) { toast('Rode antes o script v2_etapa3_etapas.sql no Supabase'); return; }
+  $('stage-id').value = '';
+  fillStageGroupSelect(groupId);
+  const stagesInGroup = cache.stages.filter(s => s.group_id === groupId);
+  $('stage-seq').value = String(stagesInGroup.length + 1);
+  $('stage-name').value = ''; $('stage-status').value = 'iniciada';
+  $('stage-start-date').value = ''; $('stage-estimated-days').value = ''; $('stage-due-date').value = '';
+  $('stage-end-date').value = ''; $('stage-received-ok').checked = false; $('stage-notes').value = '';
+  $('stage-form').classList.remove('hidden');
+  $('stage-group-form').classList.add('hidden');
+  $('stage-form').scrollIntoView({ behavior: 'smooth' });
+};
 
 window.editStage = (id) => {
   const s = cache.stages.find(x => x.id === id);
   $('stage-id').value = s.id;
-  $('stage-project').value = s.project_id;
+  fillStageGroupSelect(s.group_id);
+  $('stage-seq').value = s.seq;
   $('stage-name').value = s.name;
-  $('stage-sequence').value = s.sequence;
   $('stage-status').value = s.status;
-  $('stage-billable').checked = s.billable_to_client;
   $('stage-start-date').value = s.start_date || '';
+  $('stage-estimated-days').value = s.estimated_days ?? '';
   $('stage-due-date').value = s.due_date || '';
   $('stage-end-date').value = s.end_date || '';
-  $('stage-cost').value = s.cost || '';
-  $('stage-payment-terms').value = s.payment_terms || '';
+  $('stage-received-ok').checked = !!s.received_ok;
   $('stage-notes').value = s.notes || '';
   $('stage-form').classList.remove('hidden');
+  $('stage-group-form').classList.add('hidden');
+  $('stage-form').scrollIntoView({ behavior: 'smooth' });
 };
+
+$('cancel-stage-btn').addEventListener('click', () => $('stage-form').classList.add('hidden'));
 
 $('save-stage-btn').addEventListener('click', async () => {
   const id = $('stage-id').value;
-  const billable = $('stage-billable').checked;
   const payload = {
-    project_id: $('stage-project').value,
+    group_id: $('stage-group').value,
+    seq: Number($('stage-seq').value) || 0,
     name: $('stage-name').value.trim(),
-    sequence: Number($('stage-sequence').value) || 0,
     status: $('stage-status').value,
     start_date: $('stage-start-date').value || null,
+    estimated_days: $('stage-estimated-days').value === '' ? null : Number($('stage-estimated-days').value),
     due_date: $('stage-due-date').value || null,
     end_date: $('stage-end-date').value || null,
-    billable_to_client: billable,
-    cost: billable ? (Number($('stage-cost').value) || 0) : null,
-    payment_terms: billable ? ($('stage-payment-terms').value.trim() || null) : null,
+    received_ok: $('stage-received-ok').checked,
     notes: $('stage-notes').value.trim() || null
   };
-  if (!payload.project_id || !payload.name) { toast('Informe projeto e nome da etapa'); return; }
+  if (!payload.group_id || !payload.name) { toast('Informe o grupo e o nome da etapa'); return; }
+  // project_id da etapa acompanha o grupo escolhido (mantém a coluna antiga preenchida).
+  const grp = cache.stageGroups.find(g => g.id === payload.group_id);
+  if (grp) payload.project_id = grp.project_id;
   const q = id ? sb.from('project_stages').update(payload).eq('id', id) : sb.from('project_stages').insert(payload);
   const { error } = await q;
   if (error) { toast(error.message); return; }

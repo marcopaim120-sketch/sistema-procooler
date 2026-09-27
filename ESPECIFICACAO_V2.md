@@ -27,12 +27,12 @@ Dashboard · Clientes · Fornecedores · Projetos & Propostas · Cotações · C
 - **Sem** as colunas Cobrado? e Valor (dados antigos permanecem no banco, ocultos).
 
 ## Etapas de implementação (testar cada uma com o usuário antes de publicar)
-1. Estrutura de Cotações (colunas novas, vínculo com material da proposta, multiprojeto).
-2. Compras (visão de realizado, condições/parcelas, fornecedor, gerar pagamentos).
-3. Etapas de Produção (grupos/etapas).
-4. Chave "Mostrar ao cliente" em todas as tabelas + filtro nas funções do portal.
-5. Portal do cliente: acesso a vários projetos, separado/junto, e Dashboard com blocos escolhíveis.
-6. Leitura automática de PDF/imagem (função no Supabase + chave da Anthropic guardada como segredo; sugere campos, usuário confirma), aba por aba, por último.
+1. ~~Estrutura de Cotações~~ — feito e publicado (24–26/09).
+2. ~~Compras (parcelas, fornecedor, gerar pagamentos)~~ — feito e publicado (26/09).
+3. **Etapas de Produção (grupos/etapas)** — código pronto e testado em 27/09 (commit local, não publicado). SQL: `v2_etapa3_etapas.sql`.
+4. **Chave "Mostrar ao cliente"** — feito em Cotações/Compras/Etapas/Pagamentos/Recebimentos (Documentos já tinha); filtro aplicado em `build_project_json` (banco), não só na tela. Código pronto e testado em 27/09 (commit local, não publicado). SQL: `v2_etapa4_visivel_cliente.sql` (roda depois do 3, reescreve a função). Ainda falta: toggle em `purchase_quotes` (cotações de fornecedor concorrente) na tela — a coluna já existe no banco e já é filtrada no portal, só falta o botão na UI.
+5. Portal do cliente: acesso a vários projetos, separado/junto, e Dashboard com blocos escolhíveis. Ainda não iniciado.
+6. Leitura automática de PDF/imagem (função no Supabase + chave da Anthropic guardada como segredo; sugere campos, usuário confirma), aba por aba, por último. Ainda não iniciado.
 
 ## Decisões finais (24/09/2026)
 - **Rateio entre projetos:** cada lançamento tem uma opção "ler documento (preenchimento automático) ou não". Quando a compra atende 2–3 projetos, o usuário faz o lançamento **manual**, informando o **valor ou o % de cada projeto** (sempre começando pelo projeto X). O documento anexado tem o valor total (maior); cada projeto recebe a sua parte; **o pagamento é único**, no valor total e na data do pedido original. Tabela `purchase_allocations` (compra × projeto × item da proposta × valor × %). A economia e o "orçado × fechado" de cada projeto usam a parte dele.
