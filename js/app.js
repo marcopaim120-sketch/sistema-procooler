@@ -143,6 +143,7 @@ function fillProjectSelects() {
     $(id).innerHTML = `<option value="">-</option>` + opts;
   });
   $('stages-project-filter').innerHTML = `<option value="">Todos os projetos</option>` + opts;
+  fillPurchaseFilters();
   $('project-client').innerHTML = cache.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   const supplierOpts = `<option value="">-</option>` + cache.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
   $('purchase-supplier').innerHTML = supplierOpts;
@@ -540,14 +541,56 @@ $('save-proposal-btn').addEventListener('click', async () => {
 const itemEstimate = (pi) => pi ? (Number(pi.quantity) || 0) * (Number(pi.estimated_unit_cost) || 0) : 0;
 const fmtDate = (d) => d ? d.split('-').reverse().join('/') : '-';
 
-// Rateio da cotação em edição (quando atende mais de um projeto)
-// Limite de projetos por cotação (só na tela; o banco não limita).
-const MAX_ALLOC_PROJECTS = 5;
-let allocRows = [];
 // Itens da proposta mais recente de cada projeto (cache de sessão)
 let proposalItemsCache = {};
 // false enquanto o banco ainda não recebeu o script v2_etapa1_cotacoes.sql
 let allocationsAvailable = true;
+
+// ---------- Filtro por projeto (Cotações e Compras compartilham o mesmo) ----------
+// '' = todos os projetos; senão, o id do projeto. Lembra o último escolhido neste navegador.
+let purchaseProjectFilter = '';
+try { purchaseProjectFilter = localStorage.getItem('purchaseProjectFilter') || ''; } catch (e) { /* sem storage: abre em "todos" */ }
+
+function fillPurchaseFilters() {
+  const ids = (cache.projects || []).map(p => p.id);
+  if (purchaseProjectFilter && !ids.includes(purchaseProjectFilter)) purchaseProjectFilter = '';
+  const opts = '<option value="">Todos os projetos</option>' +
+    (cache.projects || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  document.querySelectorAll('.purchase-filter').forEach(sel => { sel.innerHTML = opts; sel.value = purchaseProjectFilter; });
+}
+
+function setPurchaseFilter(v) {
+  purchaseProjectFilter = v || '';
+  try { localStorage.setItem('purchaseProjectFilter', purchaseProjectFilter); } catch (e) { /* ignora */ }
+  document.querySelectorAll('.purchase-filter').forEach(sel => { sel.value = purchaseProjectFilter; });
+  renderPurchases();
+  renderCompras();
+}
+document.querySelectorAll('.purchase-filter').forEach(sel => sel.addEventListener('change', (e) => setPurchaseFilter(e.target.value)));
+
+const inPurchaseFilter = (p) => !purchaseProjectFilter || p.project_id === purchaseProjectFilter;
+
+// Resumo do projeto escolhido (ou de todos): só das cotações que estão na tela
+function summaryHtml(list, labelAll) {
+  const n = list.length;
+  const real = list.filter(p => p.status === 'realizado').length;
+  let orcado = 0, fechado = 0, economia = 0;
+  for (const p of list) {
+    const c = cache.calc[p.id];
+    orcado += Number(p.budgeted_cost) || 0;
+    fechado += c.fechado || 0;
+    if (c.fechado) economia += c.economia;
+  }
+  const proj = purchaseProjectFilter ? (cache.projects || []).find(x => x.id === purchaseProjectFilter)?.name : labelAll;
+  const cell = (t, v, color) => `<div><div class="muted" style="font-size:12px">${t}</div><div style="font-size:18px;font-weight:600${color ? ';color:' + color : ''}">${v}</div></div>`;
+  return `<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
+    <div><div class="muted" style="font-size:12px">Resumo</div><div style="font-size:18px;font-weight:600">${proj || ''}</div></div>
+    ${cell('Cotações', n + (n ? ` (${real} realizada${real === 1 ? '' : 's'})` : ''))}
+    ${cell('Orçado', brl(orcado))}
+    ${cell('Fechado', fechado ? brl(fechado) : '-')}
+    ${cell('Economia', fechado ? brl(economia) : '-', fechado ? (economia >= 0 ? 'var(--success)' : 'var(--danger)') : '')}
+  </div>`;
+}
 // ---------- Chave "Mostrar ao cliente" (V2 etapa 4) ----------
 // true até prova em contrário: assim que uma tabela vier sem a coluna, o load daquela
 // tabela ajusta a flag e o botão de visibilidade some (nada quebra se o script não rodou).
@@ -680,7 +723,15 @@ async function loadPurchases() {
   cache.calc = computePurchaseCalc(data);
   visibilityAvailable = hasCol(data, 'visible_to_client');
   $('purchase-v2-notice').classList.toggle('hidden', allocationsAvailable);
-  $('purchases-table').innerHTML = data.map(p => {
+  renderPurchases();
+  renderCompras();
+  await loadDashboard();
+}
+
+function renderPurchases() {
+  const list = (cache.purchases || []).filter(inPurchaseFilter);
+  $('purchases-summary').innerHTML = summaryHtml(list, 'Todos os projetos');
+  $('purchases-table').innerHTML = list.map(p => {
     const { estimado, fechado, economia, projetos, materiais, notes } = cache.calc[p.id];
     return `<tr>
       <td class="num">${p.priority ?? 0}</td>
@@ -700,82 +751,8 @@ async function loadPurchases() {
         <button class="danger" onclick="deleteRow('purchases', '${p.id}', loadPurchases)">Excluir</button>
       </td>
     </tr>`;
-  }).join('');
-  renderCompras();
-  await loadDashboard();
+  }).join('') || '<tr><td class="muted" colspan="13">Nenhuma cotação neste projeto ainda.</td></tr>';
 }
-
-// ---------- Rateio entre projetos ----------
-const docTotalValue = () => Number($('purchase-doc-total').value) || Number($('purchase-actual').value) || 0;
-
-function updateAllocSum() {
-  const total = docTotalValue();
-  const sum = allocRows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-  const diff = Number((total - sum).toFixed(2));
-  const el = $('purchase-alloc-sum');
-  el.textContent = `Soma dos projetos: ${brl(sum)} de ${brl(total)}` + (diff ? ` — diferença ${brl(diff)}` : ' ✓');
-  el.style.color = diff ? 'var(--danger)' : 'var(--success)';
-}
-
-async function renderAllocBlock() {
-  const block = $('purchase-alloc-block');
-  const splitBtn = $('split-purchase-btn');
-  if (allocRows.length < 2) { block.classList.add('hidden'); splitBtn.classList.toggle('hidden', !allocationsAvailable); return; }
-  block.classList.remove('hidden');
-  splitBtn.classList.add('hidden');
-  const projOpts = (sel) => '<option value="">Escolha...</option>' + (cache.projects || []).map(pr => `<option value="${pr.id}" ${pr.id === sel ? 'selected' : ''}>${pr.name}</option>`).join('');
-  const rows = [];
-  for (let i = 0; i < allocRows.length; i++) {
-    const r = allocRows[i];
-    const items = await getProposalItems(r.project_id);
-    const itemOpts = '<option value="">-</option>' + items.map(it => `<option value="${it.id}" ${it.id === r.proposal_item_id ? 'selected' : ''}>${it.description}</option>`).join('');
-    rows.push(`<tr>
-      <td><select onchange="allocChange(${i}, 'project_id', this.value)">${projOpts(r.project_id)}</select></td>
-      <td><select onchange="allocChange(${i}, 'proposal_item_id', this.value)">${itemOpts}</select></td>
-      <td><input type="number" step="0.01" value="${r.amount ?? ''}" onchange="allocChange(${i}, 'amount', this.value)" style="width:110px"></td>
-      <td><input type="number" step="0.01" value="${r.pct ?? ''}" onchange="allocChange(${i}, 'pct', this.value)" style="width:70px"></td>
-      <td>${i > 0 ? `<button class="danger" onclick="removeAlloc(${i})">x</button>` : ''}</td>
-    </tr>`);
-  }
-  $('purchase-alloc-rows').innerHTML = rows.join('');
-  updateAllocSum();
-}
-
-window.allocChange = (i, field, val) => {
-  const r = allocRows[i];
-  const total = docTotalValue();
-  if (field === 'amount') {
-    r.amount = val === '' ? null : Number(val);
-    if (total && r.amount != null) r.pct = Number((r.amount / total * 100).toFixed(3));
-  } else if (field === 'pct') {
-    r.pct = val === '' ? null : Number(val);
-    if (total && r.pct != null) r.amount = Number((total * r.pct / 100).toFixed(2));
-  } else {
-    r[field] = val || null;
-    if (field === 'project_id') r.proposal_item_id = null;
-  }
-  renderAllocBlock();
-};
-
-window.removeAlloc = (i) => {
-  allocRows.splice(i, 1);
-  renderAllocBlock();
-};
-
-$('split-purchase-btn').addEventListener('click', async () => {
-  const total = docTotalValue();
-  allocRows = [
-    { project_id: $('purchase-project').value || null, proposal_item_id: $('purchase-proposal-item').value || null, amount: total || null, pct: total ? 100 : null },
-    { project_id: null, proposal_item_id: null, amount: null, pct: null }
-  ];
-  await renderAllocBlock();
-});
-$('add-alloc-btn').addEventListener('click', async () => {
-  if (allocRows.length >= MAX_ALLOC_PROJECTS) { toast(`Use no máximo ${MAX_ALLOC_PROJECTS} projetos por cotação`); return; }
-  allocRows.push({ project_id: null, proposal_item_id: null, amount: null, pct: null });
-  await renderAllocBlock();
-});
-$('purchase-doc-total').addEventListener('input', () => { if (allocRows.length > 1) updateAllocSum(); });
 
 $('new-purchase-btn').addEventListener('click', () => {
   $('purchase-id').value = ''; $('purchase-description').value = ''; $('purchase-priority').value = '0';
@@ -786,8 +763,8 @@ $('new-purchase-btn').addEventListener('click', () => {
   $('purchase-payment-terms').value = ''; $('purchase-notes').value = '';
   $('purchase-proposal-item').innerHTML = '<option value="">-</option>';
   proposalItemsCache = {};
-  allocRows = [];
-  renderAllocBlock();
+  $('purchase-project').value = purchaseProjectFilter || '';
+  $('purchase-project').dispatchEvent(new Event('change'));
   $('purchase-form').classList.remove('hidden');
   $('quotes-panel').classList.add('hidden');
 });
@@ -827,9 +804,6 @@ window.editPurchase = async (id) => {
   $('purchase-payment-terms').value = p.forma_pagamento || '';
   $('purchase-notes').value = p.notes || '';
   $('purchase-status').value = p.status;
-  const allocs = (p.purchase_allocations || []).slice().sort((a, b) => (b.project_id === p.project_id) - (a.project_id === p.project_id));
-  allocRows = allocs.length > 1 ? allocs.map(a => ({ project_id: a.project_id, proposal_item_id: a.proposal_item_id, amount: a.amount, pct: a.pct })) : [];
-  await renderAllocBlock();
   $('purchase-form').classList.remove('hidden');
   setTimeout(() => { $('purchase-proposal-item').value = p.proposal_item_id || ''; }, 300);
 };
@@ -857,15 +831,6 @@ $('save-purchase-btn').addEventListener('click', async () => {
     payload.expected_delivery_date = $('purchase-expected-delivery').value || null;
     payload.delivery_date = $('purchase-delivery-date').value || null;
   }
-  const rows = allocationsAvailable && allocRows.length > 1 ? allocRows : null;
-  if (rows) {
-    if (rows.some(r => !r.project_id)) { toast('Escolha o projeto em todas as linhas do rateio'); return; }
-    if (new Set(rows.map(r => r.project_id)).size !== rows.length) { toast('Cada projeto só pode aparecer uma vez no rateio'); return; }
-    // O primeiro projeto do rateio é o principal da cotação; o "fechado" dele é a parte dele.
-    payload.project_id = rows[0].project_id;
-    payload.proposal_item_id = rows[0].proposal_item_id || null;
-    payload.actual_cost = Number(rows[0].amount) || 0;
-  }
   if (!payload.project_id || !payload.description) { toast('Informe projeto e descrição'); return; }
   const q = id ? sb.from('purchases').update(payload).eq('id', id).select('id').single()
                : sb.from('purchases').insert(payload).select('id').single();
@@ -873,17 +838,13 @@ $('save-purchase-btn').addEventListener('click', async () => {
   if (error) { toast(error.message); return; }
   let warn = '';
   if (allocationsAvailable) {
-    const list = rows || [{ project_id: payload.project_id, proposal_item_id: payload.proposal_item_id, amount: payload.actual_cost, pct: 100 }];
+    const list = [{ project_id: payload.project_id, proposal_item_id: payload.proposal_item_id, amount: payload.actual_cost, pct: 100 }];
     await sb.from('purchase_allocations').delete().eq('purchase_id', saved.id);
     const { error: e2 } = await sb.from('purchase_allocations').insert(list.map(r => ({
       purchase_id: saved.id, project_id: r.project_id, proposal_item_id: r.proposal_item_id || null,
       amount: Number(r.amount) || 0, pct: r.pct ?? null
     })));
-    if (e2) warn = ' (o rateio não foi salvo: ' + e2.message + ')';
-    else if (rows) {
-      const sum = rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-      if (Math.abs(sum - docTotalValue()) > 0.009) warn = ' — atenção: a soma do rateio não fecha com o total do documento';
-    }
+    if (e2) warn = ' (o vínculo com o projeto não foi salvo: ' + e2.message + ')';
   }
   $('purchase-form').classList.add('hidden');
   await loadPurchases();
@@ -1118,7 +1079,8 @@ function paymentSummary(p) {
 
 function renderCompras() {
   $('compras-v2-notice').classList.toggle('hidden', installmentsAvailable);
-  const list = (cache.purchases || []).filter(p => p.status === 'realizado');
+  const list = (cache.purchases || []).filter(p => p.status === 'realizado' && inPurchaseFilter(p));
+  $('compras-summary').innerHTML = summaryHtml(list, 'Todos os projetos');
   $('compras-table').innerHTML = list.map(p => {
     const { estimado, fechado, economia, projetos, materiais, notes } = cache.calc[p.id];
     return `<tr>
@@ -1161,7 +1123,6 @@ window.openCompraPanel = (id) => {
   $('compra-panel-title').textContent = `Pagamento — ${p.description}`;
   $('compra-total').textContent = brl(purchaseTotal(p));
   $('compra-date').textContent = fmtDate(p.purchase_date);
-  $('compra-multi-note').classList.toggle('hidden', (p.purchase_allocations || []).length < 2);
   fillCompraSupplierSelect(p.supplier_id);
   $('compra-supplier-form').classList.add('hidden');
   const inst = (p.purchase_installments || []).slice().sort((a, b) => a.seq - b.seq);

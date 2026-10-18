@@ -256,7 +256,9 @@
     <!-- COMPRAS -->
     <section id="view-purchases" class="view">
       <div class="toolbar"><h2>Cotações</h2><button id="new-purchase-btn">+ Nova cotação</button></div>
-      <p id="purchase-v2-notice" class="muted hidden" style="color:#b7791f">Atenção: o banco ainda não recebeu o script <b>v2_etapa1_cotacoes.sql</b>. Enquanto isso, rateio entre projetos, valor total do documento e as novas datas ficam desligados.</p>
+      <div class="row" style="margin-bottom:8px"><div class="field"><label>Projeto</label><select id="purchases-project-filter" class="purchase-filter"></select></div></div>
+      <div id="purchases-summary" class="card" style="margin-bottom:8px"></div>
+      <p id="purchase-v2-notice" class="muted hidden" style="color:#b7791f">Atenção: o banco ainda não recebeu o script <b>v2_etapa1_cotacoes.sql</b>. Enquanto isso, o valor total do documento e as novas datas ficam desligados.</p>
       <div id="purchase-form" class="card hidden">
         <div class="row">
           <div class="field"><label>Projeto</label><select id="purchase-project"></select></div>
@@ -283,15 +285,6 @@
         </div>
         <div class="row">
           <div class="field"><label>Data da compra</label><input id="purchase-date" type="date"></div>
-        </div>
-        <button type="button" class="secondary" id="split-purchase-btn">+ Dividir esta compra entre mais de um projeto</button>
-        <div id="purchase-alloc-block" class="hidden" style="margin-top:8px">
-          <label>Rateio entre projetos (a compra e o pagamento são um só; aqui você divide o valor por projeto)</label>
-          <table class="items-table">
-            <thead><tr><th>Projeto</th><th>Material da proposta</th><th>Valor (R$)</th><th>%</th><th></th></tr></thead>
-            <tbody id="purchase-alloc-rows"></tbody>
-          </table>
-          <div style="margin-top:6px"><button type="button" class="secondary" id="add-alloc-btn">+ Projeto</button> <span id="purchase-alloc-sum" class="muted"></span></div>
         </div>
         <div class="row">
           <div class="field"><label>Forma de pagamento</label><input id="purchase-payment-terms" placeholder="Ex: 1+3, 1+28, 1+30/60"></div>
@@ -384,6 +377,8 @@
     <!-- COMPRAS (cotações com status "realizado") -->
     <section id="view-compras" class="view">
       <div class="toolbar"><h2>Compras</h2></div>
+      <div class="row" style="margin-bottom:8px"><div class="field"><label>Projeto</label><select id="compras-project-filter" class="purchase-filter"></select></div></div>
+      <div id="compras-summary" class="card" style="margin-bottom:8px"></div>
       <p class="muted">Aqui aparecem as cotações com status <b>realizado</b>. Para mudar valores ou datas, use <b>Editar</b> (abre a cotação); para o pedido e comprovantes, use <b>Anexos</b>.</p>
       <p id="compras-v2-notice" class="muted hidden" style="color:#b7791f">Atenção: o banco ainda não recebeu o script <b>v2_etapa2_compras.sql</b>. Enquanto isso, parcelas e o cadastro completo do fornecedor ficam desligados.</p>
       <div class="card">
@@ -427,7 +422,6 @@
           <tbody id="compra-installments"></tbody>
         </table>
         <p id="compra-plan-sum" class="muted"></p>
-        <p id="compra-multi-note" class="muted hidden">Compra dividida entre projetos: os pagamentos são lançados no projeto principal (o primeiro do rateio).</p>
         <button id="compra-save-plan-btn">Salvar condições</button>
         <button class="secondary" id="compra-generate-btn">Gerar pagamentos</button>
       </div>
