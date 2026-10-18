@@ -611,12 +611,25 @@ const inPurchaseFilter = (p) => !purchaseProjectFilter || p.project_id === purch
 function summaryHtml(list, labelAll) {
   const n = list.length;
   const real = list.filter(p => p.status === 'realizado').length;
+  // Economia = estimado da proposta (cada item contado UMA vez, mesmo comprado em várias cotações)
+  // menos o fechado; cotações sem item da proposta usam Orçado − Fechado.
   let orcado = 0, fechado = 0, economia = 0;
+  const seenItems = new Set();
   for (const p of list) {
     const c = cache.calc[p.id];
     orcado += Number(p.budgeted_cost) || 0;
     fechado += c.fechado || 0;
-    if (c.fechado) economia += c.economia;
+    if (!c.fechado) continue;
+    const allocs = p.purchase_allocations || [];
+    const lines = allocs.length
+      ? allocs.map(l => ({ itemId: l.proposal_item_id, item: l.proposal_items, amount: Number(l.amount) || 0 }))
+      : [{ itemId: p.proposal_item_id, item: p.proposal_items, amount: Number(p.actual_cost) || 0 }];
+    const linked = lines.filter(l => l.itemId && l.item);
+    if (!linked.length) { economia += c.economia; continue; }
+    for (const l of linked) {
+      if (!seenItems.has(l.itemId)) { seenItems.add(l.itemId); economia += itemEstimate(l.item); }
+      economia -= l.amount;
+    }
   }
   const proj = purchaseProjectFilter ? (cache.projects || []).find(x => x.id === purchaseProjectFilter)?.name : labelAll;
   const cell = (t, v, color) => `<div><div class="muted" style="font-size:12px">${t}</div><div style="font-size:18px;font-weight:600${color ? ';color:' + color : ''}">${v}</div></div>`;
