@@ -6,6 +6,7 @@
 <title>Pro Cooler — Acompanhamento do projeto</title>
 <link rel="stylesheet" href="css/style.css">
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>.sec-off{display:none !important}</style>
 </head>
 <body>
 
@@ -43,7 +44,7 @@
       </div>
     </div>
 
-    <div class="savings-box">
+    <div class="savings-box" data-section="economia">
       <div class="eyebrow">Economia comprovada</div>
       <div class="muted">Economia gerada com nossa assessoria de compras</div>
       <div class="amount" id="savings-amount">R$ 0,00</div>
@@ -51,9 +52,9 @@
       <div class="muted" id="commission-explain" style="margin-top:6px"></div>
     </div>
 
-    <div class="card accent-blue">
+    <div class="card accent-blue" data-section-any="proposta,materiais,comparativo_antigo,concorrentes">
       <h3>💼 Sua proposta comercial</h3>
-      <p class="muted">No modelo Pro Cooler de assessoria, quem paga os fornecedores é você — direto, sem intermediação e sem margem escondida no preço do equipamento. Nós usamos nossa experiência pra negociar o melhor preço em seu nome, e cobramos só pelo nosso trabalho de mão de obra e gestão. O resultado: você sabe exatamente pra onde vai cada real do seu investimento.</p>
+      <p class="muted" data-section-any="proposta,comparativo_antigo">No modelo Pro Cooler de assessoria, quem paga os fornecedores é você — direto, sem intermediação e sem margem escondida no preço do equipamento. Nós usamos nossa experiência pra negociar o melhor preço em seu nome, e cobramos só pelo nosso trabalho de mão de obra e gestão. O resultado: você sabe exatamente pra onde vai cada real do seu investimento.</p>
 
       <div id="savings-hero" class="hidden savings-hero">
         <div class="pct" id="savings-hero-pct"></div>
@@ -71,21 +72,28 @@
         </div>
       </div>
 
-      <div class="row">
+      <div class="row" data-section="proposta">
         <div><div class="muted">Total em materiais</div><div id="material-total" style="font-weight:700"></div></div>
         <div><div class="muted">Mão de obra</div><div id="labor-total" style="font-weight:700"></div></div>
         <div><div class="muted">Total da proposta</div><div id="proposal-total" style="font-weight:700;color:var(--primary)"></div></div>
       </div>
-      <p class="muted" style="margin-top:10px">O detalhamento item a item da proposta está disponível como anexo em "Documentos e anexos", mais abaixo.</p>
+      <p class="muted" style="margin-top:10px" data-section="proposta">O detalhamento item a item da proposta está disponível como anexo em "Documentos e anexos", mais abaixo.</p>
 
-      <div id="competitors-box" class="hidden" style="margin-top:16px">
+      <div data-section="materiais" style="margin-top:16px">
+        <h4>Materiais orçados</h4>
+        <div style="overflow-x:auto">
+        <table><thead><tr><th>Item</th><th>Un.</th><th>Qtd.</th><th>Valor unitário</th><th>Total</th></tr></thead><tbody id="materials-list"></tbody></table>
+        </div>
+      </div>
+
+      <div id="competitors-box" class="hidden" data-section="concorrentes" style="margin-top:16px">
         <h4>Comparativo de mercado (concorrentes)</h4>
         <p class="muted">Pesquisamos o mercado pra você ver com seus próprios olhos onde a Pro Cooler se posiciona.</p>
         <table><thead><tr><th>Concorrente</th><th>Preço</th></tr></thead><tbody id="competitors-list"></tbody></table>
       </div>
     </div>
 
-    <div class="card accent-blue">
+    <div class="card accent-blue" data-section="cotacoes">
       <h3>🤝 Cotações de fornecedores comparadas</h3>
       <p class="muted">Propostas de diferentes fornecedores para o mesmo item — cotamos primeiro, depois compramos. Aqui você acompanha como chegamos na escolha.</p>
       <div style="overflow-x:auto">
@@ -96,7 +104,7 @@
       </div>
     </div>
 
-    <div class="card accent-blue">
+    <div class="card accent-blue" data-section="compras">
       <h3>🛒 Evolução das compras</h3>
       <div class="progress-bar"><div id="purchase-progress" style="width:0%"></div></div>
       <p class="muted" id="purchase-progress-label"></p>
@@ -108,7 +116,7 @@
       </div>
     </div>
 
-    <div class="card accent-blue">
+    <div class="card accent-blue" data-section="servicos">
       <h3>🧰 Cotações de serviços terceirizados comparadas</h3>
       <table>
         <thead><tr><th>Serviço</th><th>Prestador</th><th>Preço</th><th>Entrada</th><th>Parcelas</th><th>Prazo</th><th>Status</th><th>Anexos</th></tr></thead>
@@ -116,7 +124,7 @@
       </table>
     </div>
 
-    <div class="card accent-blue">
+    <div class="card accent-blue" data-section="servicos">
       <h3>🎨 Serviços terceirizados</h3>
       <p class="muted">Pintura, corte, laminação e outros serviços feitos por prestadores externos. Quando não cobrados de você, aparecem só como etapa e status, sem valor.</p>
       <div style="overflow-x:auto">
@@ -127,7 +135,7 @@
       </div>
     </div>
 
-    <div class="card accent-blue">
+    <div class="card accent-blue" data-section="etapas">
       <h3>🏗️ Etapas de produção</h3>
       <table>
         <thead><tr><th>Grupo</th><th>Seq.</th><th>Etapa</th><th>Início</th><th>Prazo estimado</th><th>Entrega real</th><th>Status</th></tr></thead>
@@ -135,7 +143,7 @@
       </table>
     </div>
 
-    <div class="card accent-amber">
+    <div class="card accent-amber" data-section="pagamentos">
       <h3>💸 Cronograma de pagamentos aos fornecedores</h3>
       <p class="muted">Pagamentos que você faz diretamente aos fornecedores (a Pro Cooler não intermedia esse valor, só acompanha).</p>
       <table>
@@ -147,7 +155,7 @@
       <tbody id="payments-monthly-list"></tbody></table>
     </div>
 
-    <div class="card accent-green">
+    <div class="card accent-green" data-section="recebimentos">
       <h3>💰 Cronograma de recebimentos da Pro Cooler</h3>
       <p class="muted">Valores referentes ao nosso serviço de assessoria/mão de obra.</p>
       <table>
@@ -156,7 +164,7 @@
       </table>
     </div>
 
-    <div class="card accent-blue">
+    <div class="card accent-blue" data-section="documentos">
       <h3>📎 Documentos e anexos</h3>
       <p class="muted">Proposta detalhada, contratos, notas fiscais e, ao final, a planta baixa / imagens do projeto. Comprovantes de compras e de serviços terceirizados ficam junto de cada item, nas seções acima.</p>
       <div id="documents-by-category"></div>

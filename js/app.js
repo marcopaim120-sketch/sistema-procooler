@@ -354,6 +354,42 @@ $('save-project-btn').addEventListener('click', async () => {
 let currentProject = null;
 let currentProposal = null;
 
+// ---------- O que o cliente vê (chaves por seção, por projeto) ----------
+const CLIENT_SECTIONS = [
+  ['proposta', 'Proposta comercial', 'totais: materiais, mão de obra e total'],
+  ['materiais', 'Materiais orçados', 'lista item a item, com valores'],
+  ['comparativo_antigo', 'Comparativo com o modelo antigo', 'barras e "% mais barato"'],
+  ['concorrentes', 'Comparativo com concorrentes', 'lista de concorrentes e preços'],
+  ['economia', 'Economia comprovada', 'valor economizado nas compras'],
+  ['taxa', 'Taxa de assessoria', 'percentual cobrado sobre a economia'],
+  ['cotacoes', 'Cotações de fornecedores', 'só as marcadas com 👁'],
+  ['compras', 'Evolução das compras', 'só as marcadas com 👁'],
+  ['servicos', 'Serviços terceirizados', 'e as cotações de prestadores'],
+  ['etapas', 'Etapas de produção', 'só as marcadas com 👁'],
+  ['pagamentos', 'Pagamentos aos fornecedores', 'só os marcados com 👁'],
+  ['recebimentos', 'Recebimentos da Pro Cooler', 'só os marcados com 👁'],
+  ['documentos', 'Documentos e anexos', 'só os marcados como visíveis']
+];
+
+function renderClientSections() {
+  const cs = (currentProject && currentProject.client_sections) || {};
+  $('client-sections-box').innerHTML = CLIENT_SECTIONS.map(([key, label, hint]) => `
+    <label style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #eef1f5;cursor:pointer">
+      <input type="checkbox" ${cs[key] ? 'checked' : ''} onchange="toggleClientSection('${key}', this)" style="width:auto;margin:0">
+      <span><strong>${label}</strong> <span class="muted">— ${hint}</span></span>
+    </label>`).join('');
+}
+
+window.toggleClientSection = async (key, box) => {
+  const next = Object.assign({}, currentProject.client_sections || {}, { [key]: box.checked });
+  const { error } = await sb.from('projects').update({ client_sections: next }).eq('id', currentProject.id);
+  if (error) { box.checked = !box.checked; toast(error.message); return; }
+  currentProject.client_sections = next;
+  const cached = cache.projects.find(p => p.id === currentProject.id);
+  if (cached) cached.client_sections = next;
+  toast(box.checked ? 'Seção ligada para o cliente' : 'Seção oculta do cliente');
+};
+
 window.openProject = async (id) => {
   currentProject = cache.projects.find(p => p.id === id);
   $('project-detail-title').textContent = currentProject.name;
@@ -362,6 +398,7 @@ window.openProject = async (id) => {
   $('project-access-password').value = '';
   $('project-detail').classList.remove('hidden');
   $('project-form').classList.add('hidden');
+  renderClientSections();
   await loadProposal(id);
 };
 

@@ -105,19 +105,25 @@ function render(data) {
   document.getElementById('content').classList.remove('hidden');
   const { project, proposal, purchases, payments, receivables, stages, purchase_quotes, outsourced_services, service_quotes, documents } = data;
 
+  // Seções: só aparece o que o gestor ligou para este projeto (o banco já não envia o resto)
+  const sections = data.sections || {};
+  document.querySelectorAll('[data-section]').forEach(el => el.classList.toggle('sec-off', !sections[el.dataset.section]));
+  document.querySelectorAll('[data-section-any]').forEach(el => el.classList.toggle('sec-off', !el.dataset.sectionAny.split(',').some(k => sections[k])));
+
   document.getElementById('project-title').textContent = project.name;
   document.getElementById('project-subtitle').textContent = `Cliente: ${project.client_name}`;
   document.getElementById('status-badge').innerHTML = `<span class="badge ${statusColor(project.status)}">${statusLabel[project.status] || project.status}</span>`;
   document.getElementById('nf-badge').innerHTML = `<span class="badge ${project.nf_status === 'emitida' ? 'green' : 'amber'}">${statusLabel[project.nf_status] || project.nf_status}${project.nf_number ? ' — ' + project.nf_number : ''}</span>`;
 
   // Proposta (só os totais aqui — o detalhamento item a item vai como anexo em Documentos)
-  let material = 0;
   if (proposal) {
-    (proposal.items || []).forEach(i => {
-      material += (Number(i.quantity) || 0) * (Number(i.estimated_unit_cost) || 0);
-    });
+    const material = Number(proposal.material_total) || 0;
     const labor = Number(proposal.labor_cost) || 0;
-    const proposalTotal = material + labor - (Number(proposal.discount) || 0);
+    const proposalTotal = Number(proposal.proposal_total) || 0;
+    document.getElementById('materials-list').innerHTML = (proposal.items || []).map(i => {
+      const q = Number(i.quantity) || 0, u = Number(i.estimated_unit_cost) || 0;
+      return `<tr><td>${i.description}</td><td>${i.unit || ''}</td><td>${q}</td><td>${brl(u)}</td><td>${brl(q * u)}</td></tr>`;
+    }).join('');
     document.getElementById('material-total').textContent = brl(material);
     document.getElementById('labor-total').textContent = brl(labor);
     document.getElementById('proposal-total').textContent = brl(proposalTotal);
@@ -176,8 +182,9 @@ function render(data) {
   `).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
 
   // Compras / economia
-  const budgeted = (purchases || []).reduce((s, p) => s + (Number(p.budgeted_cost) || 0), 0);
-  const actual = (purchases || []).reduce((s, p) => s + (Number(p.actual_cost) || 0), 0);
+  const eco = data.economy || {};
+  const budgeted = Number(eco.budgeted) || 0;
+  const actual = Number(eco.actual) || 0;
   const savings = budgeted - actual;
   document.getElementById('savings-amount').textContent = brl(savings > 0 ? savings : 0);
   document.getElementById('savings-explain').textContent = budgeted
