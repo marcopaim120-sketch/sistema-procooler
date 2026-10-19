@@ -269,7 +269,9 @@ function render(data) {
   renderMonthlySummary('payments-monthly-list', payments || []);
 
   // Recebimentos (cliente -> Pro Cooler)
-  document.getElementById('receivables-list').innerHTML = (receivables || []).map(r => `
+  // em ordem de pagamento (vencimento; sem data vão para o fim)
+  const recvSorted = (receivables || []).slice().sort((a, b) => String(a.due_date || a.paid_date || '9999').localeCompare(String(b.due_date || b.paid_date || '9999')));
+  document.getElementById('receivables-list').innerHTML = recvSorted.map(r => `
     <tr><td>${brl(r.amount)}</td><td>${fmtD(r.due_date)}</td><td>${fmtD(r.paid_date)}</td><td><span class="badge ${statusColor(r.status)}">${statusLabel[r.status] || r.status}</span></td>
       <td>${renderDocLinks(r.documents)}</td></tr>
   `).join('') + ((receivables || []).length ? (() => {
