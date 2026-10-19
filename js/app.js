@@ -381,7 +381,9 @@ function renderClientSections() {
 }
 
 window.toggleClientSection = async (key, box) => {
-  const next = Object.assign({}, currentProject.client_sections || {}, { [key]: box.checked });
+  // relê do banco antes de gravar, para não apagar mudanças feitas em outra aba/pessoa
+  const { data: fresh } = await sb.from('projects').select('client_sections').eq('id', currentProject.id).single();
+  const next = Object.assign({}, (fresh && fresh.client_sections) || currentProject.client_sections || {}, { [key]: box.checked });
   const { error } = await sb.from('projects').update({ client_sections: next }).eq('id', currentProject.id);
   if (error) { box.checked = !box.checked; toast(error.message); return; }
   currentProject.client_sections = next;
