@@ -234,7 +234,9 @@ function render(data) {
       <td>${p.data_prevista_cotacao || '-'}</td><td>${p.closing_date || '-'}</td>
       <td>${p.data_prevista_compra || '-'}</td><td>${p.forma_pagamento || '-'}</td>
       <td><span class="badge ${statusColor(p.status)}">${statusLabel[p.status] || p.status}</span></td><td>${renderDocLinks(p.documents)}</td></tr>
-  `).join('') || '<tr><td class="muted">Nenhuma compra registrada ainda.</td></tr>';
+  `).join('') + ((purchases || []).length
+    ? `<tr><td><strong>Total</strong></td><td><strong>${brl((purchases || []).reduce((s, p) => s + (Number(p.budgeted_cost) || 0), 0))}</strong></td><td><strong>${brl((purchases || []).reduce((s, p) => s + (Number(p.actual_cost) || 0), 0))}</strong></td><td colspan="6"></td></tr>`
+    : '<tr><td class="muted">Nenhuma compra registrada ainda.</td></tr>');
 
   // Pagamentos (cliente -> fornecedor)
   document.getElementById('payments-list').innerHTML = (payments || []).map(p => `
@@ -247,7 +249,11 @@ function render(data) {
   document.getElementById('receivables-list').innerHTML = (receivables || []).map(r => `
     <tr><td>${brl(r.amount)}</td><td>${r.due_date || '-'}</td><td>${r.paid_date || '-'}</td><td><span class="badge ${statusColor(r.status)}">${statusLabel[r.status] || r.status}</span></td>
       <td>${renderDocLinks(r.documents)}</td></tr>
-  `).join('') || '<tr><td class="muted">Nenhum recebimento programado ainda.</td></tr>';
+  `).join('') + ((receivables || []).length ? (() => {
+    const total = receivables.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const recebido = receivables.filter(r => r.paid_date || r.status === 'pago').reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    return `<tr><td><strong>${brl(total)}</strong></td><td colspan="4"><strong>Total programado</strong> · recebido <strong>${brl(recebido)}</strong> · a receber <strong>${brl(total - recebido)}</strong></td></tr>`;
+  })() : '<tr><td class="muted">Nenhum recebimento programado ainda.</td></tr>');
 
   // Documentos, agrupados por categoria (planta baixa/projeto técnico por último)
   const categoryLabel = {
