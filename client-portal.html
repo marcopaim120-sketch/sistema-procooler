@@ -6,7 +6,7 @@
 <title>Pro Cooler — Acompanhamento do projeto</title>
 <link rel="stylesheet" href="css/style.css">
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<style>.sec-off{display:none !important}</style>
+<style>.sec-off{display:none !important} .plan-img{width:100%;height:auto;border:1px solid #d5dbe3;border-radius:6px;background:#fff;display:block} .pdf-frame{width:100%;height:85vh;border:1px solid #d5dbe3;border-radius:6px;margin-top:8px} @media (max-width:700px){.pdf-frame{display:none}}</style>
 </head>
 <body>
 
@@ -36,6 +36,16 @@
   </div>
 
   <div class="main" style="max-width:900px;margin:0 auto">
+
+    <div class="card accent-blue" data-section="planta">
+      <h3>🗺️ Planta do projeto</h3>
+      <p class="muted" id="plan-hint">Toque ou clique na imagem para ampliar. Os números da legenda identificam cada item da proposta.</p>
+      <div id="plan-images"></div>
+      <div id="proposal-docs-box" class="hidden" style="margin-top:18px">
+        <h4>📄 Proposta</h4>
+        <div id="proposal-docs"></div>
+      </div>
+    </div>
 
     <div class="card accent-blue">
       <div class="row">

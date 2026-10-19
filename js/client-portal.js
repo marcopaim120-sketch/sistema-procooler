@@ -117,6 +117,16 @@ function render(data) {
   document.querySelectorAll('[data-section]').forEach(el => el.classList.toggle('sec-off', !sections[el.dataset.section]));
   document.querySelectorAll('[data-section-any]').forEach(el => el.classList.toggle('sec-off', !el.dataset.sectionAny.split(',').some(k => sections[k])));
 
+  // Planta do projeto (imagem + legenda) e proposta em PDF, no topo
+  const planUrl = (d) => sb.storage.from('documents').getPublicUrl(d.storage_path).data.publicUrl;
+  const planImgs = data.plan || [];
+  document.getElementById('plan-images').innerHTML = planImgs.map(d => `<a href="${planUrl(d)}" target="_blank" rel="noopener" style="display:block;margin-bottom:10px"><img class="plan-img" src="${planUrl(d)}" alt="${d.file_name}" loading="eager"></a>`).join('');
+  const propDocs = data.proposal_docs || [];
+  document.getElementById('proposal-docs-box').classList.toggle('hidden', !propDocs.length);
+  document.getElementById('proposal-docs').innerHTML = propDocs.map((d, i) => `
+    <p style="margin:6px 0"><a class="pdf-link" href="${planUrl(d)}" target="_blank" rel="noopener" style="display:inline-block;background:var(--primary,#1e4d8b);color:#fff;text-decoration:none;font-weight:600;padding:8px 14px;border-radius:6px">📄 Abrir / baixar a proposta (PDF)</a> <span class="muted">${d.file_name}</span></p>
+    ${i === 0 ? `<iframe class="pdf-frame" src="${planUrl(d)}#view=FitH" title="Proposta"></iframe>` : ''}`).join('');
+
   document.getElementById('project-title').textContent = project.name;
   document.getElementById('project-subtitle').textContent = `Cliente: ${project.client_name}`;
   document.getElementById('status-badge').innerHTML = `<span class="badge ${statusColor(project.status)}">${statusLabel[project.status] || project.status}</span>`;

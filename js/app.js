@@ -356,6 +356,7 @@ let currentProposal = null;
 
 // ---------- O que o cliente vê (chaves por seção, por projeto) ----------
 const CLIENT_SECTIONS = [
+  ['planta', 'Planta do projeto e proposta (PDF)', 'no topo: imagem da planta com a legenda (Documentos → categoria "Planta baixa / projeto técnico") e o PDF da proposta (categoria "Proposta detalhada"), ambos marcados como visíveis'],
   ['proposta', 'Proposta comercial', 'totais: materiais, mão de obra e total'],
   ['materiais', 'Materiais orçados', 'lista item a item, com valores'],
   ['comparativo_antigo', 'Comparativo com o modelo antigo', 'barras e "% mais barato"'],
