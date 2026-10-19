@@ -165,6 +165,30 @@
       </table>
     </div>
 
+    <div class="card accent-blue" data-section="gastos">
+      <h3>🧾 Total de gastos no projeto</h3>
+      <p class="muted">Soma das compras realizadas com a mão de obra da Pro Cooler já recebida. Considera só os lançamentos mostrados nesta página.</p>
+      <table>
+        <tbody>
+          <tr><td>Compras realizadas</td><td id="sp-purchases" style="text-align:right"></td></tr>
+          <tr><td>Mão de obra Pro Cooler (recebido)</td><td id="sp-labor" style="text-align:right"></td></tr>
+          <tr style="background:#f8fafc;border-top:2px solid #cbd5e1"><td><strong id="sp-project-name">Total de gastos neste projeto</strong></td><td id="sp-total" style="text-align:right;font-weight:700"></td></tr>
+        </tbody>
+      </table>
+
+      <div id="sp-others-box" class="hidden" style="margin-top:16px">
+        <h4>Somar outros projetos do mesmo cliente</h4>
+        <p class="muted" style="margin:0 0 6px">Marque os projetos que deseja incluir no total geral.</p>
+        <table><tbody id="sp-others"></tbody></table>
+        <button type="button" class="secondary" id="sp-toggle-all" style="margin-top:8px">Marcar todos</button>
+      </div>
+
+      <div style="margin-top:16px;padding:12px 14px;background:#e6f4ea;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div><strong>Total geral com todos os gastos registrados</strong><div class="muted" id="sp-grand-note" style="font-size:12px"></div></div>
+        <div id="sp-grand" style="font-size:22px;font-weight:700;color:#1b7a3a"></div>
+      </div>
+    </div>
+
     <div class="card accent-blue" data-section="documentos">
       <h3>📎 Documentos e anexos</h3>
       <p class="muted">Proposta detalhada, contratos, notas fiscais e, ao final, a planta baixa / imagens do projeto. Comprovantes de compras e de serviços terceirizados ficam junto de cada item, nas seções acima.</p>

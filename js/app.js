@@ -368,6 +368,7 @@ const CLIENT_SECTIONS = [
   ['etapas', 'Etapas de produção', 'só as marcadas com 👁'],
   ['pagamentos', 'Pagamentos aos fornecedores', 'só os marcados com 👁'],
   ['recebimentos', 'Recebimentos da Pro Cooler', 'só os marcados com 👁'],
+  ['gastos', 'Total de gastos do projeto', 'compras realizadas + mão de obra recebida; soma opcional de outros projetos do mesmo cliente (que também estejam com esta chave ligada)'],
   ['documentos', 'Documentos e anexos', 'só os marcados como visíveis']
 ];
 
