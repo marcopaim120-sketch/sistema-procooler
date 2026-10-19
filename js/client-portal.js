@@ -122,10 +122,15 @@ function render(data) {
   const planImgs = data.plan || [];
   document.getElementById('plan-images').innerHTML = planImgs.map(d => `<a href="${planUrl(d)}" target="_blank" rel="noopener" style="display:block;margin-bottom:10px"><img class="plan-img" src="${planUrl(d)}" alt="${d.file_name}" loading="eager"></a>`).join('');
   const propDocs = data.proposal_docs || [];
+  const isPdf = (d) => /\.pdf$/i.test(d.storage_path);
+  const propPdfs = propDocs.filter(isPdf);
+  const propImgs = propDocs.filter(d => !isPdf(d)).sort((x, y) => x.file_name.localeCompare(y.file_name, 'pt', { numeric: true }));
   document.getElementById('proposal-docs-box').classList.toggle('hidden', !propDocs.length);
-  document.getElementById('proposal-docs').innerHTML = propDocs.map((d, i) => `
-    <p style="margin:6px 0"><a class="pdf-link" href="${planUrl(d)}" target="_blank" rel="noopener" style="display:inline-block;background:var(--primary,#1e4d8b);color:#fff;text-decoration:none;font-weight:600;padding:8px 14px;border-radius:6px">📄 Abrir / baixar a proposta (PDF)</a> <span class="muted">${d.file_name}</span></p>
-    ${i === 0 ? `<iframe class="pdf-frame" src="${planUrl(d)}#view=FitH" title="Proposta"></iframe>` : ''}`).join('');
+  document.getElementById('proposal-docs').innerHTML =
+    (propPdfs[0] ? `<p style="margin:6px 0"><a class="pdf-link" href="${planUrl(propPdfs[0])}" target="_blank" rel="noopener" style="display:inline-block;background:var(--primary,#1e4d8b);color:#fff;text-decoration:none;font-weight:600;padding:8px 14px;border-radius:6px">📄 Baixar a proposta (PDF)</a></p>` : '')
+    + propImgs.map(d => `<a href="${planUrl(d)}" target="_blank" rel="noopener" style="display:block;margin-top:10px"><img class="plan-img" src="${planUrl(d)}" alt="${d.file_name}" loading="lazy"></a>`).join('')
+    // sem imagens das páginas: usa o PDF embutido (só em telas grandes)
+    + (!propImgs.length && propPdfs[0] ? `<iframe class="pdf-frame" src="${planUrl(propPdfs[0])}#view=FitH" title="Proposta"></iframe>` : '');
 
   document.getElementById('project-title').textContent = project.name;
   document.getElementById('project-subtitle').textContent = `Cliente: ${project.client_name}`;
