@@ -275,9 +275,13 @@ function render(data) {
     <tr><td>${brl(r.amount)}</td><td>${fmtD(r.due_date)}</td><td>${fmtD(r.paid_date)}</td><td><span class="badge ${statusColor(r.status)}">${statusLabel[r.status] || r.status}</span></td>
       <td>${renderDocLinks(r.documents)}</td></tr>
   `).join('') + ((receivables || []).length ? (() => {
-    const total = receivables.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+    const programado = receivables.reduce((s, r) => s + (Number(r.amount) || 0), 0);
     const recebido = receivables.filter(r => r.paid_date || r.status === 'pago').reduce((s, r) => s + (Number(r.amount) || 0), 0);
-    return `<tr><td><strong>${brl(total)}</strong></td><td colspan="4"><strong>Total programado</strong> · recebido <strong>${brl(recebido)}</strong> · a receber <strong>${brl(total - recebido)}</strong></td></tr>`;
+    const labor = Number(data.labor_total) || 0;   // mão de obra contratada (proposta)
+    if (labor > 0) {
+      return `<tr><td><strong>${brl(labor)}</strong></td><td colspan="4"><strong>Total contratado (mão de obra)</strong> · recebido <strong>${brl(recebido)}</strong> · a receber <strong>${brl(Math.max(labor - recebido, 0))}</strong></td></tr>`;
+    }
+    return `<tr><td><strong>${brl(programado)}</strong></td><td colspan="4"><strong>Total programado</strong> · recebido <strong>${brl(recebido)}</strong> · a receber <strong>${brl(programado - recebido)}</strong></td></tr>`;
   })() : '<tr><td class="muted">Nenhum recebimento programado ainda.</td></tr>');
 
   // Documentos, agrupados por categoria (planta baixa/projeto técnico por último)
