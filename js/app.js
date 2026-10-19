@@ -462,6 +462,7 @@ function renderProposalItems() {
       <td><input type="number" step="0.001" value="${it.quantity}" data-field="quantity" data-i="${i}" style="width:80px"></td>
       <td><input type="number" step="0.01" value="${it.estimated_unit_cost}" data-field="estimated_unit_cost" data-i="${i}" style="width:100px"></td>
       <td class="num">${brl(it.quantity * it.estimated_unit_cost)}</td>
+      <td style="text-align:center"><input type="checkbox" ${it.purchase_done ? 'checked' : ''} ${it._new ? 'disabled title="Salve a proposta antes"' : ''} onchange="toggleItemDone('${it.id}', this)" style="width:auto"></td>
       <td><button class="danger" onclick="removeProposalItem('${it.id}')">x</button></td>
     </tr>`).join('');
   document.querySelectorAll('#proposal-items-table input').forEach(inp => {
@@ -478,6 +479,14 @@ $('add-proposal-item').addEventListener('click', () => {
   cache.proposalItems.push({ id: `new-${Date.now()}`, description: '', unit: 'un', quantity: 1, estimated_unit_cost: 0, _new: true });
   renderProposalItems();
 });
+
+window.toggleItemDone = async (id, box) => {
+  const { error } = await sb.from('proposal_items').update({ purchase_done: box.checked }).eq('id', id);
+  if (error) { box.checked = !box.checked; toast(error.message); return; }
+  const it = cache.proposalItems.find(x => x.id === id);
+  if (it) it.purchase_done = box.checked;
+  toast(box.checked ? 'Compra do material marcada como concluída' : 'Compra do material em andamento');
+};
 
 window.removeProposalItem = async (id) => {
   if (!String(id).startsWith('new-')) {

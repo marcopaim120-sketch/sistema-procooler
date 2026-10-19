@@ -182,14 +182,41 @@ function render(data) {
   `).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
 
   // Compras / economia
-  const eco = data.economy || {};
-  const budgeted = Number(eco.budgeted) || 0;
-  const actual = Number(eco.actual) || 0;
-  const savings = budgeted - actual;
+  // Economia comprovada: estimado da proposta x gasto, por material (só os já comprados)
+  const ecoItems = (data.economy && data.economy.items) || [];
+  const doneItems = ecoItems.filter(i => i.done);
+  const estDone = doneItems.reduce((s, i) => s + (Number(i.estimated) || 0), 0);
+  const spentDone = doneItems.reduce((s, i) => s + (Number(i.spent) || 0), 0);
+  const savings = estDone - spentDone;
   document.getElementById('savings-amount').textContent = brl(savings > 0 ? savings : 0);
-  document.getElementById('savings-explain').textContent = budgeted
-    ? `Orçado: ${brl(budgeted)} · Realizado: ${brl(actual)}`
-    : 'Ainda não há compras registradas neste projeto.';
+  document.getElementById('savings-explain').textContent = doneItems.length
+    ? `Estimamos ${brl(estDone)} para os materiais com compra concluída e, até o momento, gastamos ${brl(spentDone)}.`
+    : (ecoItems.length
+      ? 'Os materiais comprados ainda estão em andamento; a economia é apurada quando a compra de cada material é concluída.'
+      : 'Ainda não há compras registradas neste projeto.');
+  const money = (v, color) => `<span style="font-weight:600;color:${color}">${brl(v)}</span>`;
+  const progressItems = ecoItems.filter(i => !i.done);
+  const estProg = progressItems.reduce((s, i) => s + (Number(i.estimated) || 0), 0);
+  const spentProg = progressItems.reduce((s, i) => s + (Number(i.spent) || 0), 0);
+  const wrapTable = (head, rows) => `<div style="overflow-x:auto"><table><thead><tr>${head.map(h => '<th>' + h + '</th>').join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  let detail = '';
+  if (doneItems.length) {
+    const rows = doneItems.map(i => {
+      const diff = (Number(i.estimated) || 0) - (Number(i.spent) || 0);
+      return `<tr><td>${i.description}</td><td>${brl(i.estimated)}</td><td>${brl(i.spent)}</td><td>${money(diff, diff >= 0 ? '#1b7a3a' : '#c92a2a')}</td></tr>`;
+    }).join('') + `<tr><td><strong>Subtotal</strong></td><td><strong>${brl(estDone)}</strong></td><td><strong>${brl(spentDone)}</strong></td><td>${money(savings, savings >= 0 ? '#1b7a3a' : '#c92a2a')}</td></tr>`;
+    detail += '<h4 style="margin:8px 0 4px">Materiais com compra concluída</h4>' + wrapTable(['Material', 'Estimado', 'Gasto', 'Economia'], rows);
+  }
+  if (progressItems.length) {
+    const rows = progressItems.map(i => `<tr><td>${i.description}</td><td>${brl(i.estimated)}</td><td>${brl(i.spent)}</td></tr>`).join('');
+    detail += '<h4 style="margin:12px 0 4px">Materiais em andamento</h4><p class="muted" style="margin:0 0 4px">A economia só é apurada quando a compra do material é concluída.</p>' + wrapTable(['Material', 'Estimado', 'Gasto até agora'], rows);
+  }
+  if (ecoItems.length) {
+    detail += `<p style="margin:12px 0 0"><strong>Total já gasto no projeto: ${brl(spentDone + spentProg)}</strong> <span class="muted">(concluídos ${brl(spentDone)} + em andamento ${brl(spentProg)}) — total registrado até o momento</span></p>`;
+  }
+  const detailEl = document.getElementById('savings-detail');
+  detailEl.innerHTML = detail;
+  detailEl.classList.toggle('hidden', !ecoItems.length);
 
   const commissionPct = proposal ? (Number(proposal.commission_pct) || 0) : 0;
   if (savings > 0 && commissionPct) {
