@@ -622,22 +622,23 @@ const inPurchaseFilter = (p) => !purchaseProjectFilter || p.project_id === purch
 function summaryHtml(list, labelAll) {
   const n = list.length;
   const real = list.filter(p => p.status === 'realizado').length;
-  // Economia = estimado da proposta (cada item contado UMA vez, mesmo comprado em várias cotações)
-  // menos o fechado; cotações sem item da proposta usam Orçado − Fechado.
-  let orcado = 0, fechado = 0, economia = 0;
+  // Mesma regra do portal do cliente: a economia só conta materiais da proposta com a compra
+  // CONCLUÍDA (marca no painel); cada material entra UMA vez (estimado − gasto nas compras realizadas).
+  // O que ainda está em andamento aparece à parte, só como gasto.
+  let orcado = 0, fechado = 0, economia = 0, andamento = 0;
   const seenItems = new Set();
   for (const p of list) {
     const c = cache.calc[p.id];
     orcado += Number(p.budgeted_cost) || 0;
     fechado += c.fechado || 0;
-    if (!c.fechado) continue;
+    if (p.status !== 'realizado') continue;
     const allocs = p.purchase_allocations || [];
     const lines = allocs.length
       ? allocs.map(l => ({ itemId: l.proposal_item_id, item: l.proposal_items, amount: Number(l.amount) || 0 }))
       : [{ itemId: p.proposal_item_id, item: p.proposal_items, amount: Number(p.actual_cost) || 0 }];
-    const linked = lines.filter(l => l.itemId && l.item);
-    if (!linked.length) { economia += c.economia; continue; }
-    for (const l of linked) {
+    for (const l of lines) {
+      if (!l.itemId || !l.item) continue;
+      if (!l.item.purchase_done) { andamento += l.amount; continue; }
       if (!seenItems.has(l.itemId)) { seenItems.add(l.itemId); economia += itemEstimate(l.item); }
       economia -= l.amount;
     }
@@ -649,7 +650,8 @@ function summaryHtml(list, labelAll) {
     ${cell('Cotações', n + (n ? ` (${real} realizada${real === 1 ? '' : 's'})` : ''))}
     ${cell('Orçado', brl(orcado))}
     ${cell('Fechado', fechado ? brl(fechado) : '-')}
-    ${cell('Economia', fechado ? brl(economia) : '-', fechado ? (economia >= 0 ? 'var(--success)' : 'var(--danger)') : '')}
+    ${cell('Economia (concluídos)', seenItems.size ? brl(economia) : '-', seenItems.size ? (economia >= 0 ? 'var(--success)' : 'var(--danger)') : '')}
+    ${andamento ? cell('Gasto em andamento', brl(andamento)) : ''}
   </div>`;
 }
 // ---------- Chave "Mostrar ao cliente" (V2 etapa 4) ----------
@@ -676,13 +678,13 @@ async function getProposalItems(projectId) {
   return (proposalItemsCache[projectId] = items || []);
 }
 
-const PURCHASE_SELECT_V2 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost), purchase_allocations(id, project_id, proposal_item_id, amount, pct, projects(name), proposal_items(description, quantity, estimated_unit_cost))';
+const PURCHASE_SELECT_V2 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost, purchase_done), purchase_allocations(id, project_id, proposal_item_id, amount, pct, projects(name), proposal_items(description, quantity, estimated_unit_cost, purchase_done))';
 const PURCHASE_SELECT_V3 = PURCHASE_SELECT_V2 + ', purchase_installments(id, seq, days_after_purchase, amount, payment_id)';
 // false enquanto o banco ainda não recebeu o script v2_etapa2_compras.sql
 let installmentsAvailable = false;
 // false enquanto o banco ainda não recebeu as colunas novas de fornecedor
 let suppliersV2 = false;
-const PURCHASE_SELECT_V1 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost)';
+const PURCHASE_SELECT_V1 = '*, projects(name), suppliers(name), proposal_items(description, quantity, estimated_unit_cost, purchase_done)';
 
 // ---------- Saldo compartilhado do Estimado ----------
 // Itens da proposta que já foram comprados JUNTOS (na mesma cotação) passam a
