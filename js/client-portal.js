@@ -30,6 +30,13 @@ function statusColor(status) {
 
 let portalToken = null;
 
+// 2026-08-21 -> 21/08/2026 (usa só os números, sem fuso horário)
+const fmtD = (v) => {
+  if (!v) return '-';
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : v;
+};
+
 (async () => {
   const params = new URLSearchParams(location.search);
   const previewProjectId = params.get('preview');
@@ -156,28 +163,28 @@ function render(data) {
   // Serviços terceirizados
   document.getElementById('services-list').innerHTML = (outsourced_services || []).map(s => `
     <tr><td>${s.name}</td><td>${s.billable_to_client ? brl(s.budgeted_cost) : '-'}</td><td>${s.billable_to_client ? brl(s.actual_cost) : '-'}</td>
-      <td>${s.data_prevista_conclusao || '-'}</td><td>${s.completion_date || '-'}</td>
+      <td>${fmtD(s.data_prevista_conclusao)}</td><td>${fmtD(s.completion_date)}</td>
       <td><span class="badge ${statusColor(s.status)}">${statusLabel[s.status] || s.status}</span></td><td>${renderDocLinks(s.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhum serviço terceirizado registrado ainda.</td></tr>';
 
   document.getElementById('service-quotes-list').innerHTML = (service_quotes || []).map(q => `
     <tr><td>${q.service_name}</td><td>${q.supplier_name || '-'}</td><td>${brl(q.price)}</td><td>${brl(q.down_payment)}</td>
-      <td>${q.installments || '-'}</td><td>${q.completion_date || '-'}</td><td><span class="badge ${statusColor(q.status)}">${statusLabel[q.status] || q.status}</span></td>
+      <td>${q.installments || '-'}</td><td>${fmtD(q.completion_date)}</td><td><span class="badge ${statusColor(q.status)}">${statusLabel[q.status] || q.status}</span></td>
       <td>${renderDocLinks(q.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma cotação de serviço registrada ainda.</td></tr>';
 
   // Etapas de produção (agrupadas; só as marcadas como visíveis ao cliente já vêm filtradas pelo banco)
   document.getElementById('stages-list').innerHTML = (stages || []).map(s => `
     <tr><td>${s.group_name}</td><td>${s.group_seq}.${s.seq}</td><td>${s.name}</td>
-      <td>${s.start_date || '-'}</td><td>${s.due_date || '-'}</td>
-      <td>${s.end_date || '-'}${s.received_ok ? ' ✓' : ''}</td>
+      <td>${fmtD(s.start_date)}</td><td>${fmtD(s.due_date)}</td>
+      <td>${fmtD(s.end_date)}${s.received_ok ? ' ✓' : ''}</td>
       <td><span class="badge ${statusColor(s.status)}">${statusLabel[s.status] || s.status}</span></td></tr>
   `).join('') || '<tr><td class="muted" colspan="7">Nenhuma etapa registrada ainda.</td></tr>';
 
   // Cotações de fornecedores comparadas
   document.getElementById('quotes-list').innerHTML = (purchase_quotes || []).map(q => `
     <tr><td>${q.purchase_description}</td><td>${q.supplier_name || '-'}</td><td>${brl(q.price)}</td><td>${brl(q.down_payment)}</td>
-      <td>${q.installments || '-'}</td><td>${q.delivery_date || '-'}</td><td><span class="badge ${statusColor(q.status)}">${statusLabel[q.status] || q.status}</span></td>
+      <td>${q.installments || '-'}</td><td>${fmtD(q.delivery_date)}</td><td><span class="badge ${statusColor(q.status)}">${statusLabel[q.status] || q.status}</span></td>
       <td>${renderDocLinks(q.documents)}</td></tr>
   `).join('') || '<tr><td class="muted">Nenhuma cotação registrada ainda.</td></tr>';
 
@@ -229,25 +236,41 @@ function render(data) {
   const pct = total ? Math.round((done / total) * 100) : 0;
   document.getElementById('purchase-progress').style.width = pct + '%';
   document.getElementById('purchase-progress-label').textContent = total ? `${done} de ${total} itens comprados (${pct}%)` : 'Nenhuma compra registrada ainda.';
+  const seenItem = new Set();
+  let estTotal = 0;
+  const estCell = (p) => {
+    if (p.proposal_item_id && p.item_estimated != null) {
+      if (seenItem.has(p.proposal_item_id)) return `<span class="muted">já contado em ${p.item_description || 'material'}</span>`;
+      seenItem.add(p.proposal_item_id);
+      estTotal += Number(p.item_estimated) || 0;
+      return brl(p.item_estimated);
+    }
+    estTotal += Number(p.budgeted_cost) || 0;   // compra sem material da proposta: usa o valor cotado
+    return brl(p.budgeted_cost);
+  };
   document.getElementById('purchases-list').innerHTML = (purchases || []).map(p => `
-    <tr><td>${p.description}</td><td>${brl(p.budgeted_cost)}</td><td>${brl(p.actual_cost)}</td>
-      <td>${p.data_prevista_cotacao || '-'}</td><td>${p.closing_date || '-'}</td>
-      <td>${p.data_prevista_compra || '-'}</td><td>${p.forma_pagamento || '-'}</td>
+    <tr><td>${p.description}</td><td>${estCell(p)}</td><td>${brl(p.actual_cost)}</td>
+      <td>${fmtD(p.data_prevista_cotacao)}</td><td>${fmtD(p.closing_date)}</td>
+      <td>${fmtD(p.data_prevista_compra)}</td><td>${p.forma_pagamento || '-'}</td>
       <td><span class="badge ${statusColor(p.status)}">${statusLabel[p.status] || p.status}</span></td><td>${renderDocLinks(p.documents)}</td></tr>
   `).join('') + ((purchases || []).length
-    ? `<tr><td><strong>Total</strong></td><td><strong>${brl((purchases || []).reduce((s, p) => s + (Number(p.budgeted_cost) || 0), 0))}</strong></td><td><strong>${brl((purchases || []).reduce((s, p) => s + (Number(p.actual_cost) || 0), 0))}</strong></td><td colspan="6"></td></tr>`
+    ? `<tr><td><strong>Total</strong></td><td><strong>${brl(estTotal)}</strong></td><td><strong>${brl((purchases || []).reduce((s, p) => s + (Number(p.actual_cost) || 0), 0))}</strong></td><td colspan="6"></td></tr>`
     : '<tr><td class="muted">Nenhuma compra registrada ainda.</td></tr>');
 
   // Pagamentos (cliente -> fornecedor)
   document.getElementById('payments-list').innerHTML = (payments || []).map(p => `
-    <tr><td>${p.supplier_name || '-'}</td><td>${brl(p.amount)}</td><td>${p.method || '-'}</td><td>${p.due_date || '-'}</td><td>${p.paid_date || '-'}</td><td><span class="badge ${statusColor(p.status)}">${statusLabel[p.status] || p.status}</span></td>
+    <tr><td>${p.supplier_name || '-'}</td><td>${brl(p.amount)}</td><td>${p.method || '-'}</td><td>${fmtD(p.due_date)}</td><td>${fmtD(p.paid_date)}</td><td><span class="badge ${statusColor(p.status)}">${statusLabel[p.status] || p.status}</span></td>
       <td>${renderDocLinks(p.documents)}</td></tr>
-  `).join('') || '<tr><td class="muted">Nenhum pagamento programado ainda.</td></tr>';
+  `).join('') + ((payments || []).length ? (() => {
+    const total = payments.reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    const pago = payments.filter(x => x.paid_date || x.status === 'pago').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    return `<tr><td><strong>Total</strong></td><td><strong>${brl(total)}</strong></td><td colspan="5">pago <strong>${brl(pago)}</strong> · a pagar <strong>${brl(total - pago)}</strong></td></tr>`;
+  })() : '<tr><td class="muted">Nenhum pagamento programado ainda.</td></tr>');
   renderMonthlySummary('payments-monthly-list', payments || []);
 
   // Recebimentos (cliente -> Pro Cooler)
   document.getElementById('receivables-list').innerHTML = (receivables || []).map(r => `
-    <tr><td>${brl(r.amount)}</td><td>${r.due_date || '-'}</td><td>${r.paid_date || '-'}</td><td><span class="badge ${statusColor(r.status)}">${statusLabel[r.status] || r.status}</span></td>
+    <tr><td>${brl(r.amount)}</td><td>${fmtD(r.due_date)}</td><td>${fmtD(r.paid_date)}</td><td><span class="badge ${statusColor(r.status)}">${statusLabel[r.status] || r.status}</span></td>
       <td>${renderDocLinks(r.documents)}</td></tr>
   `).join('') + ((receivables || []).length ? (() => {
     const total = receivables.reduce((s, r) => s + (Number(r.amount) || 0), 0);
