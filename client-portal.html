@@ -167,14 +167,17 @@
 
     <div class="card accent-blue" data-section="gastos">
       <h3>🧾 Total de gastos no projeto</h3>
-      <p class="muted">Soma das compras realizadas com a mão de obra da Pro Cooler já recebida. Considera só os lançamentos mostrados nesta página.</p>
+      <p class="muted">Compras realizadas e mão de obra da Pro Cooler já recebida, com o saldo que ainda resta de cada um. Considera só os lançamentos mostrados nesta página; materiais usam a estimativa da proposta.</p>
+      <div style="overflow-x:auto">
       <table>
+        <thead><tr><th></th><th style="text-align:right">Total previsto</th><th style="text-align:right">Gasto até agora</th><th style="text-align:right">Saldo restante</th></tr></thead>
         <tbody>
-          <tr><td>Compras realizadas</td><td id="sp-purchases" style="text-align:right"></td></tr>
-          <tr><td>Mão de obra Pro Cooler (recebido)</td><td id="sp-labor" style="text-align:right"></td></tr>
-          <tr style="background:#f8fafc;border-top:2px solid #cbd5e1"><td><strong id="sp-project-name">Total de gastos neste projeto</strong></td><td id="sp-total" style="text-align:right;font-weight:700"></td></tr>
+          <tr><td>Materiais</td><td id="sp-mat-total" style="text-align:right"></td><td id="sp-purchases" style="text-align:right"></td><td id="sp-mat-saldo" style="text-align:right"></td></tr>
+          <tr><td>Mão de obra Pro Cooler</td><td id="sp-lab-total" style="text-align:right"></td><td id="sp-labor" style="text-align:right"></td><td id="sp-lab-saldo" style="text-align:right"></td></tr>
+          <tr style="background:#f8fafc;border-top:2px solid #cbd5e1;font-weight:700"><td id="sp-project-name">Total do projeto</td><td id="sp-prev-total" style="text-align:right"></td><td id="sp-total" style="text-align:right"></td><td id="sp-saldo-total" style="text-align:right"></td></tr>
         </tbody>
       </table>
+      </div>
 
       <div id="sp-others-box" class="hidden" style="margin-top:16px">
         <h4>Somar outros projetos do mesmo cliente</h4>
@@ -183,9 +186,12 @@
         <button type="button" class="secondary" id="sp-toggle-all" style="margin-top:8px">Marcar todos</button>
       </div>
 
-      <div style="margin-top:16px;padding:12px 14px;background:#e6f4ea;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div><strong>Total geral com todos os gastos registrados</strong><div class="muted" id="sp-grand-note" style="font-size:12px"></div></div>
-        <div id="sp-grand" style="font-size:22px;font-weight:700;color:#1b7a3a"></div>
+      <div style="margin-top:16px;padding:12px 14px;background:#e6f4ea;border-radius:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <div><strong>Total geral com todos os gastos registrados</strong><div class="muted" id="sp-grand-note" style="font-size:12px"></div></div>
+          <div id="sp-grand" style="font-size:22px;font-weight:700;color:#1b7a3a"></div>
+        </div>
+        <div class="muted" id="sp-grand-detail" style="margin-top:6px"></div>
       </div>
     </div>
 

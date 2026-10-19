@@ -286,32 +286,44 @@ function render(data) {
       + line(saldo, '<strong>Saldo ainda a receber</strong>', 'background:#f8fafc');
   })() : '<tr><td class="muted">Nenhum recebimento programado ainda.</td></tr>');
 
-  // Total de gastos do projeto + soma opcional de outros projetos do mesmo cliente
+  // Total de gastos do projeto (com saldo) + soma opcional de outros projetos do mesmo cliente
   const sp = data.spending;
   if (sp) {
-    const own = (Number(sp.purchases_total) || 0) + (Number(sp.labor_received) || 0);
-    document.getElementById('sp-purchases').textContent = brl(sp.purchases_total);
-    document.getElementById('sp-labor').textContent = brl(sp.labor_received);
-    document.getElementById('sp-project-name').textContent = 'Total de gastos — ' + project.name;
-    document.getElementById('sp-total').textContent = brl(own);
-    const others = sp.others || [];
+    const calc = (o) => {
+      const matTotal = Number(o.material_estimated) || 0, labTotal = Number(o.labor_contracted) || 0;
+      const matGasto = Number(o.purchases_total) || 0, labGasto = Number(o.labor_received) || 0;
+      return { matTotal, labTotal, matGasto, labGasto, matSaldo: matTotal - matGasto, labSaldo: labTotal - labGasto,
+        prev: matTotal + labTotal, gasto: matGasto + labGasto, saldo: (matTotal - matGasto) + (labTotal - labGasto) };
+    };
+    const saldoHtml = (v) => `<span style="color:${v < 0 ? '#c92a2a' : 'inherit'}">${brl(v)}</span>`;
+    const own = calc(sp);
+    document.getElementById('sp-mat-total').textContent = brl(own.matTotal);
+    document.getElementById('sp-purchases').textContent = brl(own.matGasto);
+    document.getElementById('sp-mat-saldo').innerHTML = saldoHtml(own.matSaldo);
+    document.getElementById('sp-lab-total').textContent = brl(own.labTotal);
+    document.getElementById('sp-labor').textContent = brl(own.labGasto);
+    document.getElementById('sp-lab-saldo').innerHTML = saldoHtml(own.labSaldo);
+    document.getElementById('sp-project-name').textContent = 'Total — ' + project.name;
+    document.getElementById('sp-prev-total').textContent = brl(own.prev);
+    document.getElementById('sp-total').textContent = brl(own.gasto);
+    document.getElementById('sp-saldo-total').innerHTML = saldoHtml(own.saldo);
+    const others = (sp.others || []).map(o => Object.assign({ name: o.name }, calc(o)));
     document.getElementById('sp-others-box').classList.toggle('hidden', !others.length);
-    document.getElementById('sp-others').innerHTML = others.map((o, i) => {
-      const v = (Number(o.purchases_total) || 0) + (Number(o.labor_received) || 0);
-      return `<tr><td><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" class="sp-other" data-i="${i}" style="width:auto"> ${o.name}</label></td><td style="text-align:right">${brl(v)}</td></tr>`;
-    }).join('');
+    document.getElementById('sp-others').innerHTML = others.map((o, i) => `<tr><td><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" class="sp-other" data-i="${i}" style="width:auto"> ${o.name}</label></td><td style="text-align:right">gasto <strong>${brl(o.gasto)}</strong></td><td style="text-align:right" class="muted">saldo ${brl(o.saldo)}</td></tr>`).join('');
     const recalc = () => {
-      let total = own;
+      const t = { prev: own.prev, gasto: own.gasto, saldo: own.saldo };
       const names = [project.name];
       document.querySelectorAll('.sp-other').forEach(cb => {
         if (!cb.checked) return;
         const o = others[Number(cb.dataset.i)];
-        total += (Number(o.purchases_total) || 0) + (Number(o.labor_received) || 0);
+        t.prev += o.prev; t.gasto += o.gasto; t.saldo += o.saldo;
         names.push(o.name);
       });
-      document.getElementById('sp-grand').textContent = brl(total);
+      document.getElementById('sp-grand').textContent = brl(t.gasto);
       document.getElementById('sp-grand-note').textContent = 'Inclui: ' + names.join(' + ');
-      document.getElementById('sp-toggle-all').textContent = [...document.querySelectorAll('.sp-other')].every(c => c.checked) ? 'Desmarcar todos' : 'Marcar todos';
+      document.getElementById('sp-grand-detail').innerHTML = `Total previsto <strong>${brl(t.prev)}</strong> · gasto <strong>${brl(t.gasto)}</strong> · saldo restante <strong>${saldoHtml(t.saldo)}</strong>`;
+      const boxes = [...document.querySelectorAll('.sp-other')];
+      document.getElementById('sp-toggle-all').textContent = boxes.length && boxes.every(c => c.checked) ? 'Desmarcar todos' : 'Marcar todos';
     };
     document.querySelectorAll('.sp-other').forEach(cb => cb.addEventListener('change', recalc));
     document.getElementById('sp-toggle-all').onclick = () => {
